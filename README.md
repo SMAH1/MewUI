@@ -8,10 +8,12 @@ Minimal, code-first .NET GUI library aimed at NativeAOT + Trim.
 
 **Sample project NativeAOT + Trimmed publish output size** (`win-x64-trimmed`): single EXE ~ `2.2 MB`
 
-This repo contains:
-- `src/MewUI` - the library (`Aprillz.MewUI`)
-- `samples/MewUI.Sample` - demo app
+<img width="620" height="588" alt="image" src="https://github.com/user-attachments/assets/3851bbca-88d0-4a2b-835f-56093244c694" />
 
+<img width="620" height="588" alt="image" src="https://github.com/user-attachments/assets/793b6c01-724e-4684-9236-29e5ad7ed04b" />
+
+
+ 
 ## C# Markup at a Glance
 
 ```csharp
