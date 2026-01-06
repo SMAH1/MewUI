@@ -1,0 +1,58 @@
+name: Release (NuGet + GitHub)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET (preview)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          include-prerelease: true
+
+      - name: Compute version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag.StartsWith("v")) { $tag = $tag.Substring(1) }
+          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Pack
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE ".artifacts/nuget"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          dotnet pack ".\src\MewUI\MewUI.csproj" -c Release -o $out `
+            /p:ContinuousIntegrationBuild=true `
+            /p:PackageVersion="${{ steps.version.outputs.version }}"
+
+      - name: Push to NuGet
+        shell: pwsh
+        run: |
+          $pkg = Get-ChildItem ".\.artifacts\nuget" -Filter "*.nupkg" -File | Select-Object -First 1
+          if (-not $pkg) { throw "No .nupkg found under .artifacts/nuget" }
+          dotnet nuget push $pkg.FullName `
+            --api-key "${{ secrets.NUGET_API_KEY }}" `
+            --source "https://api.nuget.org/v3/index.json" `
+            --skip-duplicate
+
+      - name: GitHub Release (auto notes)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .artifacts/nuget/*.nupkg
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
