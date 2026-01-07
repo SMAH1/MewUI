@@ -22,6 +22,10 @@
 - https://www.nuget.org/packages/Aprillz.MewUI/
 - Install: `dotnet add package Aprillz.MewUI --prerelease`
 
+---
+## Video
+https://github.com/user-attachments/assets/876c1450-de36-4ccf-9cf8-b47f035a300f
+
 ## Screenshots
 
 | Light | Dark |
