@@ -145,7 +145,7 @@ public class TextBox : Control, IDisposable
             var textX = contentBounds.X - _scrollOffset;
 
             // Draw selection background if any
-            if (_selectionLength > 0 && IsFocused)
+            if (_selectionLength != 0 && IsFocused)
             {
                 var selStart = Math.Min(_selectionStart, _selectionStart + _selectionLength);
                 var selEnd = Math.Max(_selectionStart, _selectionStart + _selectionLength);
@@ -209,6 +209,7 @@ public class TextBox : Control, IDisposable
             if (root is Window window)
                 window.CaptureMouse(this);
 
+            EnsureCaretVisible();
             InvalidateVisual();
             e.Handled = true;
         }
@@ -220,14 +221,26 @@ public class TextBox : Control, IDisposable
 
         if (IsMouseCaptured && e.LeftButton)
         {
-            // Update selection
+            // Update selection (with auto-scroll when dragging outside the visible region)
             var contentBounds = Bounds.Deflate(Padding);
+
+            // If the pointer goes beyond the text box, scroll in that direction.
+            // This matches common native text box behavior and enables selecting off-screen text.
+            const double edgeDip = 8;
+            if (e.Position.X < contentBounds.X + edgeDip)
+                _scrollOffset += e.Position.X - (contentBounds.X + edgeDip);
+            else if (e.Position.X > contentBounds.Right - edgeDip)
+                _scrollOffset += e.Position.X - (contentBounds.Right - edgeDip);
+
+            ClampScrollOffset();
+
             var clickX = e.Position.X - contentBounds.X + _scrollOffset;
 
             var newPos = GetCharacterIndexFromX(clickX);
             _selectionLength = newPos - _selectionStart;
             CaretPosition = newPos;
 
+            EnsureCaretVisible();
             InvalidateVisual();
             e.Handled = true;
         }
@@ -333,15 +346,34 @@ public class TextBox : Control, IDisposable
 
         using var measure = BeginTextMeasurement();
 
-        double prevWidth = 0;
-        for (int i = 0; i <= Text.Length; i++)
+        if (x <= 0)
+            return 0;
+
+        double totalWidth = measure.Context.MeasureText(Text, measure.Font).Width;
+        if (x >= totalWidth)
+            return Text.Length;
+
+        // Binary search to avoid O(n^2) measurement cost for long text.
+        int lo = 0;
+        int hi = Text.Length;
+        while (lo < hi)
         {
-            var width = i > 0 ? measure.Context.MeasureText(Text[..i], measure.Font).Width : 0;
-            if (x < (prevWidth + width) / 2)
-                return Math.Max(0, i - 1);
-            prevWidth = width;
+            int mid = lo + ((hi - lo) / 2);
+            double w = mid > 0 ? measure.Context.MeasureText(Text[..mid], measure.Font).Width : 0;
+            if (w < x)
+                lo = mid + 1;
+            else
+                hi = mid;
         }
-        return Text.Length;
+
+        int idx = Math.Clamp(lo, 0, Text.Length);
+
+        // Snap to the nearest caret position using midpoints for better feel.
+        if (idx <= 0)
+            return 0;
+        double w0 = measure.Context.MeasureText(Text[..(idx - 1)], measure.Font).Width;
+        double w1 = measure.Context.MeasureText(Text[..idx], measure.Font).Width;
+        return x < (w0 + w1) / 2 ? idx - 1 : idx;
     }
 
     private void MoveCaret(int direction, bool extend, bool word)
@@ -495,6 +527,34 @@ public class TextBox : Control, IDisposable
         {
             _scrollOffset = Math.Max(0, caretX - 10);
         }
+
+        ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
+    }
+
+    private void ClampScrollOffset()
+    {
+        if (string.IsNullOrEmpty(Text))
+        {
+            _scrollOffset = 0;
+            return;
+        }
+
+        var contentBounds = Bounds.Deflate(Padding);
+        using var measure = BeginTextMeasurement();
+        ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
+    }
+
+    private void ClampScrollOffset(IGraphicsContext context, IFont font, double viewportWidthDip)
+    {
+        if (string.IsNullOrEmpty(Text))
+        {
+            _scrollOffset = 0;
+            return;
+        }
+
+        double textWidth = context.MeasureText(Text, font).Width;
+        double maxOffset = Math.Max(0, textWidth - Math.Max(0, viewportWidthDip));
+        _scrollOffset = Math.Clamp(_scrollOffset, 0, maxOffset);
     }
 
     private static bool IsNavigationKey(Input.Key key) =>
