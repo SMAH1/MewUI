@@ -19,6 +19,7 @@ public sealed class MultiLineTextBox : Control
     private double _horizontalOffset;
     private double _lineHeight;
     private readonly List<int> _lineStarts = new() { 0 };
+    private bool _suppressTextInputNewline;
 
     private readonly ScrollBar _vBar;
     private readonly ScrollBar _hBar;
@@ -48,7 +49,7 @@ public sealed class MultiLineTextBox : Control
             if (field == value)
                 return;
 
-            field = value ?? string.Empty;
+            field = NormalizeText(value ?? string.Empty, AcceptsReturn);
             CaretPosition = Math.Min(CaretPosition, field.Length);
             _selectionStart = 0;
             _selectionLength = 0;
@@ -385,6 +386,7 @@ public sealed class MultiLineTextBox : Control
                 if (!IsReadOnly && AcceptsReturn)
                 {
                     InsertText("\n");
+                    _suppressTextInputNewline = true;
                     e.Handled = true;
                 }
                 break;
@@ -412,10 +414,23 @@ public sealed class MultiLineTextBox : Control
         if (IsReadOnly || e.Handled)
             return;
 
-        if (!AcceptsReturn && e.Text.Contains('\n'))
+        var text = e.Text ?? string.Empty;
+
+        if (_suppressTextInputNewline)
+        {
+            _suppressTextInputNewline = false;
+            if (text.Contains('\r') || text.Contains('\n'))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        text = NormalizeText(text, AcceptsReturn);
+        if (text.Length == 0)
             return;
 
-        InsertText(e.Text);
+        InsertText(text);
         e.Handled = true;
     }
 
@@ -610,8 +625,12 @@ public sealed class MultiLineTextBox : Control
     {
         DeleteSelectionIfAny();
 
-        Text = Text.Insert(CaretPosition, text);
-        CaretPosition += text.Length;
+        var normalized = NormalizeText(text, AcceptsReturn);
+        if (normalized.Length == 0)
+            return;
+
+        Text = Text.Insert(CaretPosition, normalized);
+        CaretPosition += normalized.Length;
         _selectionStart = CaretPosition;
         _selectionLength = 0;
     }
@@ -642,8 +661,9 @@ public sealed class MultiLineTextBox : Control
         if (!TryClipboardGetText(out var s) || string.IsNullOrEmpty(s))
             return;
 
-        if (!AcceptsReturn)
-            s = s.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        s = NormalizeText(s, AcceptsReturn);
+        if (s.Length == 0)
+            return;
 
         InsertText(s);
     }
@@ -766,6 +786,9 @@ public sealed class MultiLineTextBox : Control
         start = _lineStarts[line];
         end = line + 1 < _lineStarts.Count ? _lineStarts[line + 1] - 1 : Text.Length;
         if (end < start) end = start;
+
+        if (end > start && Text[end - 1] == '\r')
+            end--;
     }
 
     private void GetLineFromIndex(int index, out int line, out int lineStart, out int lineEnd)
@@ -804,6 +827,20 @@ public sealed class MultiLineTextBox : Control
             return 0;
 
         return context.MeasureText(Text.Substring(start, end - start), font).Width;
+    }
+
+    private static string NormalizeText(string text, bool acceptsReturn)
+    {
+        if (text.Length == 0)
+            return string.Empty;
+
+        // Normalize Windows line endings and stray CR into '\n' to keep layout/caret math consistent.
+        text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+
+        if (acceptsReturn)
+            return text;
+
+        return text.Replace("\n", string.Empty);
     }
 
     protected override void OnDispose()
