@@ -55,6 +55,16 @@ public sealed class Theme
     public double FontSize { get; }
     public FontWeight FontWeight { get; }
 
+    // Scroll (thin style defaults)
+    public double ScrollBarThickness { get; }
+    public double ScrollBarMinThumbLength { get; }
+    public double ScrollWheelStep { get; }
+    public double ScrollBarSmallChange { get; }
+    public double ScrollBarLargeChange { get; }
+    public Color ScrollBarThumb { get; }
+    public Color ScrollBarThumbHover { get; }
+    public Color ScrollBarThumbActive { get; }
+
     public Theme WithAccent(Color accent, Color? accentText = null)
     {
         return WithPalette(Palette.WithAccent(accent, accentText));
@@ -66,7 +76,15 @@ public sealed class Theme
         double controlCornerRadius,
         string fontFamily,
         double fontSize,
-        FontWeight fontWeight)
+        FontWeight fontWeight,
+        double scrollBarThickness,
+        double scrollBarMinThumbLength,
+        double scrollWheelStep,
+        double scrollBarSmallChange,
+        double scrollBarLargeChange,
+        Color scrollBarThumb,
+        Color scrollBarThumbHover,
+        Color scrollBarThumbActive)
     {
         Name = name;
         Palette = palette;
@@ -74,6 +92,15 @@ public sealed class Theme
         FontFamily = fontFamily;
         FontSize = fontSize;
         FontWeight = fontWeight;
+
+        ScrollBarThickness = scrollBarThickness;
+        ScrollBarMinThumbLength = scrollBarMinThumbLength;
+        ScrollWheelStep = scrollWheelStep;
+        ScrollBarSmallChange = scrollBarSmallChange;
+        ScrollBarLargeChange = scrollBarLargeChange;
+        ScrollBarThumb = scrollBarThumb;
+        ScrollBarThumbHover = scrollBarThumbHover;
+        ScrollBarThumbActive = scrollBarThumbActive;
     }
 
     public Theme WithPalette(Palette palette)
@@ -85,7 +112,15 @@ public sealed class Theme
             controlCornerRadius: ControlCornerRadius,
             fontFamily: FontFamily,
             fontSize: FontSize,
-            fontWeight: FontWeight);
+            fontWeight: FontWeight,
+            scrollBarThickness: ScrollBarThickness,
+            scrollBarMinThumbLength: ScrollBarMinThumbLength,
+            scrollWheelStep: ScrollWheelStep,
+            scrollBarSmallChange: ScrollBarSmallChange,
+            scrollBarLargeChange: ScrollBarLargeChange,
+            scrollBarThumb: ScrollBarThumb,
+            scrollBarThumbHover: ScrollBarThumbHover,
+            scrollBarThumbActive: ScrollBarThumbActive);
     }
 
     private static Theme CreateLight()
@@ -105,7 +140,15 @@ public sealed class Theme
             controlCornerRadius: 3,
             fontFamily: "Segoe UI",
             fontSize: 12,
-            fontWeight: FontWeight.Normal);
+            fontWeight: FontWeight.Normal,
+            scrollBarThickness: 3,
+            scrollBarMinThumbLength: 14,
+            scrollWheelStep: 32,
+            scrollBarSmallChange: 24,
+            scrollBarLargeChange: 120,
+            scrollBarThumb: Color.FromArgb(0x66, 0, 0, 0),
+            scrollBarThumbHover: Color.FromArgb(0x88, 0, 0, 0),
+            scrollBarThumbActive: Color.FromArgb(0xAA, 0, 0, 0));
     }
 
     private static Theme CreateDark()
@@ -125,6 +168,14 @@ public sealed class Theme
             controlCornerRadius: 3,
             fontFamily: "Segoe UI",
             fontSize: 12,
-            fontWeight: FontWeight.Normal);
+            fontWeight: FontWeight.Normal,
+            scrollBarThickness: 3,
+            scrollBarMinThumbLength: 14,
+            scrollWheelStep: 32,
+            scrollBarSmallChange: 24,
+            scrollBarLargeChange: 120,
+            scrollBarThumb: Color.FromArgb(0x66, 255, 255, 255),
+            scrollBarThumbHover: Color.FromArgb(0x88, 255, 255, 255),
+            scrollBarThumbActive: Color.FromArgb(0xAA, 255, 255, 255));
     }
 }
