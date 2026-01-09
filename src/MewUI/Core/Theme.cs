@@ -62,9 +62,9 @@ public sealed class Theme
     public double ScrollWheelStep { get; }
     public double ScrollBarSmallChange { get; }
     public double ScrollBarLargeChange { get; }
-    public Color ScrollBarThumb { get; }
-    public Color ScrollBarThumbHover { get; }
-    public Color ScrollBarThumbActive { get; }
+    public Color ScrollBarThumb => Palette.ScrollBarThumb;
+    public Color ScrollBarThumbHover => Palette.ScrollBarThumbHover;
+    public Color ScrollBarThumbActive => Palette.ScrollBarThumbActive;
 
     public Theme WithAccent(Color accent, Color? accentText = null)
     {
@@ -83,10 +83,7 @@ public sealed class Theme
         double scrollBarMinThumbLength,
         double scrollWheelStep,
         double scrollBarSmallChange,
-        double scrollBarLargeChange,
-        Color scrollBarThumb,
-        Color scrollBarThumbHover,
-        Color scrollBarThumbActive)
+        double scrollBarLargeChange)
     {
         Name = name;
         Palette = palette;
@@ -101,9 +98,6 @@ public sealed class Theme
         ScrollWheelStep = scrollWheelStep;
         ScrollBarSmallChange = scrollBarSmallChange;
         ScrollBarLargeChange = scrollBarLargeChange;
-        ScrollBarThumb = scrollBarThumb;
-        ScrollBarThumbHover = scrollBarThumbHover;
-        ScrollBarThumbActive = scrollBarThumbActive;
     }
 
     public Theme WithPalette(Palette palette)
@@ -121,10 +115,7 @@ public sealed class Theme
             scrollBarMinThumbLength: ScrollBarMinThumbLength,
             scrollWheelStep: ScrollWheelStep,
             scrollBarSmallChange: ScrollBarSmallChange,
-            scrollBarLargeChange: ScrollBarLargeChange,
-            scrollBarThumb: ScrollBarThumb,
-            scrollBarThumbHover: ScrollBarThumbHover,
-            scrollBarThumbActive: ScrollBarThumbActive);
+            scrollBarLargeChange: ScrollBarLargeChange);
     }
 
     private static Theme CreateLight()
@@ -150,19 +141,16 @@ public sealed class Theme
             scrollBarMinThumbLength: 14,
             scrollWheelStep: 32,
             scrollBarSmallChange: 24,
-            scrollBarLargeChange: 120,
-            scrollBarThumb: Color.FromArgb(0x44, 0, 0, 0),
-            scrollBarThumbHover: Color.FromArgb(0x66, 0, 0, 0),
-            scrollBarThumbActive: Color.FromArgb(0x88, 0, 0, 0));
+            scrollBarLargeChange: 120);
     }
 
     private static Theme CreateDark()
     {
         var palette = new Palette(
             name: "Dark",
-            windowBackground: Color.FromRgb(24, 24, 24),
+            windowBackground: Color.FromRgb(28, 28, 28),
             windowText: Color.FromRgb(230, 230, 232),
-            controlBackground: Color.FromRgb(38, 38, 40),
+            controlBackground: Color.FromRgb(26, 26, 27),
             buttonFace: Color.FromRgb(48, 48, 50),
             buttonDisabledBackground: Color.FromRgb(60, 60, 64),
             accent: Color.FromRgb(214, 165, 94));
@@ -179,9 +167,6 @@ public sealed class Theme
             scrollBarMinThumbLength: 14,
             scrollWheelStep: 32,
             scrollBarSmallChange: 24,
-            scrollBarLargeChange: 120,
-            scrollBarThumb: Color.FromArgb(0x44, 255, 255, 255),
-            scrollBarThumbHover: Color.FromArgb(0x66, 255, 255, 255),
-            scrollBarThumbActive: Color.FromArgb(0x88, 255, 255, 255));
+            scrollBarLargeChange: 120);
     }
 }

@@ -27,6 +27,10 @@ public sealed class Palette
     public Color TextBoxDisabledBackground { get; }
     public Color FocusRect { get; }
 
+    public Color ScrollBarThumb { get; }
+    public Color ScrollBarThumbHover { get; }
+    public Color ScrollBarThumbActive { get; }
+
     public Palette(
         string name,
         Color windowBackground,
@@ -56,11 +60,13 @@ public sealed class Palette
 
         ControlBorder = ComputeControlBorder(windowBackground, windowText, accent);
         DisabledText = ComputeDisabledText(windowBackground, windowText);
-        PlaceholderText = DisabledText;
+        PlaceholderText = DisabledText.WithAlpha(127);
         TextBoxDisabledBackground = ComputeTextBoxDisabledBackground(windowBackground, controlBackground);
         ButtonHoverBackground = buttonFace.Lerp(accent, hoverT);
         ButtonPressedBackground = buttonFace.Lerp(accent, pressedT);
         FocusRect = accent;
+
+        (ScrollBarThumb, ScrollBarThumbHover, ScrollBarThumbActive) = ComputeScrollBarThumbs(windowBackground);
     }
 
     private Palette(
@@ -80,7 +86,10 @@ public sealed class Palette
         Color disabledText,
         Color placeholderText,
         Color textBoxDisabledBackground,
-        Color focusRect)
+        Color focusRect,
+        Color scrollBarThumb,
+        Color scrollBarThumbHover,
+        Color scrollBarThumbActive)
     {
         Name = name;
         WindowBackground = windowBackground;
@@ -99,6 +108,9 @@ public sealed class Palette
         PlaceholderText = placeholderText;
         TextBoxDisabledBackground = textBoxDisabledBackground;
         FocusRect = focusRect;
+        ScrollBarThumb = scrollBarThumb;
+        ScrollBarThumbHover = scrollBarThumbHover;
+        ScrollBarThumbActive = scrollBarThumbActive;
     }
 
     public Palette WithAccent(Color accent, Color? accentText = null)
@@ -114,6 +126,7 @@ public sealed class Palette
         var textBoxDisabledBackground = ComputeTextBoxDisabledBackground(WindowBackground, ControlBackground);
         var selectionBackground = ComputeSelectionBackground(ControlBackground, accent);
         var selectionText = GetDefaultAccentText(selectionBackground);
+        var (scrollBarThumb, scrollBarThumbHover, scrollBarThumbActive) = ComputeScrollBarThumbs(WindowBackground);
 
         return new Palette(
             name: Name,
@@ -132,7 +145,10 @@ public sealed class Palette
             disabledText: disabledText,
             placeholderText: placeholderText,
             textBoxDisabledBackground: textBoxDisabledBackground,
-            focusRect: accent);
+            focusRect: accent,
+            scrollBarThumb: scrollBarThumb,
+            scrollBarThumbHover: scrollBarThumbHover,
+            scrollBarThumbActive: scrollBarThumbActive);
     }
 
     private static bool IsDarkBackground(Color color) => (color.R + color.G + color.B) < 128 * 3;
@@ -167,5 +183,16 @@ public sealed class Palette
     {
         var luma = (0.2126 * accent.R + 0.7152 * accent.G + 0.0722 * accent.B) / 255.0;
         return luma >= 0.6 ? Color.FromRgb(28, 28, 32) : Color.FromRgb(248, 246, 255);
+    }
+
+    private static (Color thumb, Color hover, Color active) ComputeScrollBarThumbs(Color windowBackground)
+    {
+        var isDark = IsDarkBackground(windowBackground);
+        byte c = isDark ? (byte)255 : (byte)0;
+        return (
+            Color.FromArgb(0x44, c, c, c),
+            Color.FromArgb(0x66, c, c, c),
+            Color.FromArgb(0x88, c, c, c)
+        );
     }
 }
