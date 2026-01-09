@@ -1,4 +1,5 @@
 using Aprillz.MewUI.Primitives;
+using Aprillz.MewUI.Elements;
 
 namespace Aprillz.MewUI.Panels;
 
@@ -36,34 +37,39 @@ public class StackPanel : Panel
 
     protected override Size MeasureContent(Size availableSize)
     {
-        double totalMain = 0;
+        double usedMain = 0;
         double maxCross = 0;
 
         var paddedSize = availableSize.Deflate(Padding);
+        bool hasPrevious = false;
 
         foreach (var child in Children)
         {
+            if (child is UIElement ui && !ui.IsVisible)
+                continue;
+
+            if (hasPrevious)
+                usedMain += Spacing;
+
             if (Orientation == Orientation.Vertical)
             {
                 child.Measure(new Size(paddedSize.Width, double.PositiveInfinity));
-                totalMain += child.DesiredSize.Height;
+                usedMain += child.DesiredSize.Height;
                 maxCross = Math.Max(maxCross, child.DesiredSize.Width);
             }
             else
             {
                 child.Measure(new Size(double.PositiveInfinity, paddedSize.Height));
-                totalMain += child.DesiredSize.Width;
+                usedMain += child.DesiredSize.Width;
                 maxCross = Math.Max(maxCross, child.DesiredSize.Height);
             }
+
+            hasPrevious = true;
         }
 
-        // Add spacing
-        if (Children.Count > 1)
-            totalMain += (Children.Count - 1) * Spacing;
-
         var contentSize = Orientation == Orientation.Vertical
-            ? new Size(maxCross, totalMain)
-            : new Size(totalMain, maxCross);
+            ? new Size(maxCross, usedMain)
+            : new Size(usedMain, maxCross);
 
         return contentSize.Inflate(Padding);
     }
@@ -72,9 +78,16 @@ public class StackPanel : Panel
     {
         var contentBounds = bounds.Deflate(Padding);
         double offset = 0;
+        bool hasPrevious = false;
 
         foreach (var child in Children)
         {
+            if (child is UIElement ui && !ui.IsVisible)
+                continue;
+
+            if (hasPrevious)
+                offset += Spacing;
+
             if (Orientation == Orientation.Vertical)
             {
                 var childHeight = child.DesiredSize.Height;
@@ -83,7 +96,7 @@ public class StackPanel : Panel
                     contentBounds.Y + offset,
                     contentBounds.Width,
                     childHeight));
-                offset += childHeight + Spacing;
+                offset += childHeight;
             }
             else
             {
@@ -93,8 +106,10 @@ public class StackPanel : Panel
                     contentBounds.Y,
                     childWidth,
                     contentBounds.Height));
-                offset += childWidth + Spacing;
+                offset += childWidth;
             }
+
+            hasPrevious = true;
         }
     }
 }

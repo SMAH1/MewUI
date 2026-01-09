@@ -1,4 +1,5 @@
 using Aprillz.MewUI.Core;
+using Aprillz.MewUI.Binding;
 using Aprillz.MewUI.Elements;
 using Aprillz.MewUI.Input;
 using Aprillz.MewUI.Platform;
@@ -20,6 +21,8 @@ public sealed class MultiLineTextBox : Control
     private double _lineHeight;
     private readonly List<int> _lineStarts = new() { 0 };
     private bool _suppressTextInputNewline;
+    private ValueBinding<string>? _textBinding;
+    private bool _suppressBindingSet;
 
     private readonly ScrollBar _vBar;
     private readonly ScrollBar _hBar;
@@ -845,7 +848,51 @@ public sealed class MultiLineTextBox : Control
 
     protected override void OnDispose()
     {
+        _textBinding?.Dispose();
+        _textBinding = null;
         _vBar.Dispose();
         _hBar.Dispose();
+    }
+
+    public void SetTextBinding(
+        Func<string> get,
+        Action<string> set,
+        Action<Action>? subscribe = null,
+        Action<Action>? unsubscribe = null)
+    {
+        _textBinding?.Dispose();
+        _textBinding = new ValueBinding<string>(
+            get,
+            set,
+            subscribe,
+            unsubscribe,
+            onSourceChanged: () =>
+            {
+                if (IsFocused)
+                    return;
+
+                var value = NormalizeText(get() ?? string.Empty, AcceptsReturn);
+                if (Text == value)
+                    return;
+
+                _suppressBindingSet = true;
+                try { Text = value; }
+                finally { _suppressBindingSet = false; }
+            });
+
+        var existing = TextChanged;
+        TextChanged = text =>
+        {
+            existing?.Invoke(text);
+
+            if (_suppressBindingSet)
+                return;
+
+            _textBinding?.Set(text);
+        };
+
+        _suppressBindingSet = true;
+        try { Text = NormalizeText(get() ?? string.Empty, AcceptsReturn); }
+        finally { _suppressBindingSet = false; }
     }
 }

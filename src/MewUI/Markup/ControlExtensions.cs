@@ -373,6 +373,18 @@ public static class ControlExtensions
         return listBox;
     }
 
+    public static ListBox ItemHeight(this ListBox listBox, double itemHeight)
+    {
+        listBox.ItemHeight = itemHeight;
+        return listBox;
+    }
+
+    public static ListBox ItemPadding(this ListBox listBox, Thickness itemPadding)
+    {
+        listBox.ItemPadding = itemPadding;
+        return listBox;
+    }
+
     public static ListBox SelectedIndex(this ListBox listBox, int selectedIndex)
     {
         listBox.SelectedIndex = selectedIndex;
@@ -396,6 +408,53 @@ public static class ControlExtensions
             subscribe: h => source.Changed += h,
             unsubscribe: h => source.Changed -= h);
         return listBox;
+    }
+
+    #endregion
+
+    #region MultiLineTextBox
+
+    public static MultiLineTextBox Text(this MultiLineTextBox textBox, string text)
+    {
+        textBox.Text = text;
+        return textBox;
+    }
+
+    public static MultiLineTextBox Placeholder(this MultiLineTextBox textBox, string placeholder)
+    {
+        textBox.Placeholder = placeholder;
+        return textBox;
+    }
+
+    public static MultiLineTextBox IsReadOnly(this MultiLineTextBox textBox, bool isReadOnly = true)
+    {
+        textBox.IsReadOnly = isReadOnly;
+        return textBox;
+    }
+
+    public static MultiLineTextBox AcceptsReturn(this MultiLineTextBox textBox, bool acceptsReturn = true)
+    {
+        textBox.AcceptsReturn = acceptsReturn;
+        return textBox;
+    }
+
+    public static MultiLineTextBox OnTextChanged(this MultiLineTextBox textBox, Action<string> handler)
+    {
+        textBox.TextChanged = handler;
+        return textBox;
+    }
+
+    public static MultiLineTextBox BindText(this MultiLineTextBox textBox, ObservableValue<string> source)
+    {
+        if (textBox == null) throw new ArgumentNullException(nameof(textBox));
+        if (source == null) throw new ArgumentNullException(nameof(source));
+
+        textBox.SetTextBinding(
+            get: () => source.Value,
+            set: v => source.Value = v,
+            subscribe: h => source.Changed += h,
+            unsubscribe: h => source.Changed -= h);
+        return textBox;
     }
 
     #endregion

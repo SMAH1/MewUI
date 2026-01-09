@@ -47,6 +47,12 @@ public class ListBox : Control
         set { field = value; InvalidateMeasure(); }
     } = double.NaN;
 
+    public Thickness ItemPadding
+    {
+        get;
+        set { field = value; InvalidateMeasure(); InvalidateVisual(); }
+    } = new Thickness(8, 2, 8, 2);
+
     public Action<int>? SelectionChanged { get; set; }
 
     public override bool Focusable => true;
@@ -70,26 +76,94 @@ public class ListBox : Control
 
     protected override Size MeasureContent(Size availableSize)
     {
-        using var measure = BeginTextMeasurement();
+        var theme = GetTheme();
+        var borderInset = GetBorderVisualInset();
+        double widthLimit = double.IsPositiveInfinity(availableSize.Width)
+            ? double.PositiveInfinity
+            : Math.Max(0, availableSize.Width - Padding.HorizontalThickness - borderInset * 2);
 
-        double maxWidth = 0;
-        foreach (var item in _items)
+        double maxWidth;
+
+        // Fast path: when stretching horizontally, the parent is going to size us by slot width anyway.
+        // Avoid scanning huge item lists just to compute a content-based desired width.
+        if (HorizontalAlignment == Elements.HorizontalAlignment.Stretch && !double.IsPositiveInfinity(widthLimit))
         {
-            if (string.IsNullOrEmpty(item))
-                continue;
-            maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width);
+            maxWidth = widthLimit;
+        }
+        else
+        {
+            using var measure = BeginTextMeasurement();
+
+            maxWidth = 0;
+
+            // If the list is huge, prefer a cheap width estimate.
+            // This keeps layout responsive; users can still explicitly set Width for deterministic sizing.
+            if (_items.Count > 4096)
+            {
+                double itemHeightEstimate = ResolveItemHeight();
+                double viewportEstimate = double.IsPositiveInfinity(availableSize.Height)
+                    ? Math.Min(_items.Count * itemHeightEstimate, itemHeightEstimate * 12)
+                    : Math.Max(0, availableSize.Height - Padding.VerticalThickness - borderInset * 2);
+
+                int visibleEstimate = itemHeightEstimate <= 0 ? _items.Count : (int)Math.Ceiling(viewportEstimate / itemHeightEstimate) + 1;
+                int sampleCount = Math.Clamp(visibleEstimate, 32, 256);
+                sampleCount = Math.Min(sampleCount, _items.Count);
+                double itemPadW = ItemPadding.HorizontalThickness;
+
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    var item = _items[i];
+                    if (string.IsNullOrEmpty(item))
+                        continue;
+
+                    maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width + itemPadW);
+                    if (maxWidth >= widthLimit)
+                    {
+                        maxWidth = widthLimit;
+                        break;
+                    }
+                }
+
+                // Ensure current selection isn't clipped when it lies outside the sample range.
+                if (SelectedIndex >= sampleCount && SelectedIndex < _items.Count && maxWidth < widthLimit)
+                {
+                    var item = _items[SelectedIndex];
+                    if (!string.IsNullOrEmpty(item))
+                        maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width + itemPadW);
+                }
+            }
+            else
+            {
+                double itemPadW = ItemPadding.HorizontalThickness;
+                foreach (var item in _items)
+                {
+                    if (string.IsNullOrEmpty(item))
+                        continue;
+
+                    maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width + itemPadW);
+                    if (maxWidth >= widthLimit)
+                    {
+                        maxWidth = widthLimit;
+                        break;
+                    }
+                }
+            }
         }
 
         double itemHeight = ResolveItemHeight();
         double height = _items.Count * itemHeight;
-
-        var borderInset = GetBorderVisualInset();
 
         // Cache extent/viewport for scroll bar (viewport is approximated here; final value computed in Arrange).
         _extentHeight = height;
         _viewportHeight = double.IsPositiveInfinity(availableSize.Height)
             ? height
             : Math.Max(0, availableSize.Height - Padding.VerticalThickness - borderInset * 2);
+
+        // If the vertical scrollbar becomes visible, it consumes horizontal space (inside the control).
+        // When we're auto-sizing width (infinite width available), reserve that space so text doesn't get clipped.
+        bool needV = _extentHeight > _viewportHeight + 0.5;
+        if (needV && double.IsPositiveInfinity(widthLimit))
+            maxWidth += theme.ScrollBarHitThickness + 1;
 
         double desiredHeight = double.IsPositiveInfinity(availableSize.Height)
             ? height
@@ -169,6 +243,8 @@ public class ListBox : Control
         var font = GetFont();
         double itemHeight = ResolveItemHeight();
 
+        // Even when "virtualization" is disabled, only paint the visible range.
+        // (Clipping makes off-screen work pure overhead for large item counts.)
         int first = itemHeight <= 0 ? 0 : Math.Max(0, (int)Math.Floor(_verticalOffset / itemHeight));
         double offsetInItem = itemHeight <= 0 ? 0 : _verticalOffset - first * itemHeight;
         double yStart = contentBounds.Y - offsetInItem;
@@ -191,7 +267,7 @@ public class ListBox : Control
             }
 
             var textColor = selected ? theme.SelectionText : (IsEnabled ? Foreground : theme.DisabledText);
-            context.DrawText(_items[i] ?? string.Empty, itemRect.Deflate(new Thickness(2, 0, 2, 0)), font, textColor,
+            context.DrawText(_items[i] ?? string.Empty, itemRect.Deflate(ItemPadding), font, textColor,
                 TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }
 
