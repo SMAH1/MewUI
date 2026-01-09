@@ -22,7 +22,7 @@ public sealed class Application
     private static IGraphicsFactory? _defaultGraphicsFactoryOverride;
     private static IPlatformHost _defaultPlatformHost = CreateDefaultPlatformHost();
     private static Exception? _pendingFatalException;
-
+   
     /// <summary>
     /// Raised when an exception escapes from the platform message loop or window procedure.
     /// Set <see cref="UiUnhandledExceptionEventArgs.Handled"/> to true to continue.
@@ -88,7 +88,7 @@ public sealed class Application
 
     public static IPlatformHost DefaultPlatformHost
     {
-        get => _defaultPlatformHost;
+        get => _defaultPlatformHost ??= CreateDefaultPlatformHost();
         set => _defaultPlatformHost = value ?? throw new ArgumentNullException(nameof(value));
     }
 

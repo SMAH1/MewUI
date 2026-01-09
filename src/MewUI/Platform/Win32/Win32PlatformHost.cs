@@ -15,6 +15,7 @@ public sealed class Win32PlatformHost : IPlatformHost
 
     private readonly Dictionary<nint, Win32WindowBackend> _windows = new();
     private readonly IMessageBoxService _messageBox = new Win32MessageBoxService();
+    private readonly IClipboardService _clipboard = new Win32ClipboardService();
     private WndProc? _wndProcDelegate;
     private bool _running;
     private ushort _classAtom;
@@ -24,9 +25,23 @@ public sealed class Win32PlatformHost : IPlatformHost
 
     public IMessageBoxService MessageBox => _messageBox;
 
+    public IClipboardService Clipboard => _clipboard;
+
     public IWindowBackend CreateWindowBackend(Window window) => new Win32WindowBackend(this, window);
 
     public IUiDispatcher CreateDispatcher(nint windowHandle) => new Win32UiDispatcher(windowHandle);
+
+    public uint GetSystemDpi() => User32.GetDpiForSystem();
+
+    public uint GetDpiForWindow(nint hwnd) => hwnd != 0 ? User32.GetDpiForWindow(hwnd) : User32.GetDpiForSystem();
+
+    public bool EnablePerMonitorDpiAwareness()
+    {
+        const nint DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+        return User32.SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+
+    public int GetSystemMetricsForDpi(int nIndex, uint dpi) => User32.GetSystemMetricsForDpi(nIndex, dpi);
 
     internal void RegisterWindow(nint hwnd, Win32WindowBackend backend) => _windows[hwnd] = backend;
 

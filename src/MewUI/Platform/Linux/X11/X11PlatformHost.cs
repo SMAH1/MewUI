@@ -14,14 +14,25 @@ public sealed class X11PlatformHost : IPlatformHost
 {
     private readonly Dictionary<nint, X11WindowBackend> _windows = new();
     private readonly IMessageBoxService _messageBox = new X11MessageBoxService();
+    private readonly IClipboardService _clipboard = new NoClipboardService();
     private bool _running;
     private nint _display;
 
     public IMessageBoxService MessageBox => _messageBox;
 
+    public IClipboardService Clipboard => _clipboard;
+
     public IWindowBackend CreateWindowBackend(Window window) => new X11WindowBackend(this, window);
 
     public IUiDispatcher CreateDispatcher(nint windowHandle) => new LinuxUiDispatcher();
+
+    public uint GetSystemDpi() => 96u;
+
+    public uint GetDpiForWindow(nint hwnd) => 96u;
+
+    public bool EnablePerMonitorDpiAwareness() => false;
+
+    public int GetSystemMetricsForDpi(int nIndex, uint dpi) => 0;
 
     internal void RegisterWindow(nint window, X11WindowBackend backend) => _windows[window] = backend;
 

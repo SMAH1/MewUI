@@ -11,12 +11,23 @@ namespace Aprillz.MewUI.Platform.Linux;
 public sealed class LinuxPlatformHost : IPlatformHost
 {
     private readonly IMessageBoxService _messageBox = new LinuxMessageBoxService();
+    private readonly IClipboardService _clipboard = new NoClipboardService();
 
     public IMessageBoxService MessageBox => _messageBox;
+
+    public IClipboardService Clipboard => _clipboard;
 
     public IWindowBackend CreateWindowBackend(Window window) => new LinuxWindowBackend(window);
 
     public IUiDispatcher CreateDispatcher(nint windowHandle) => new LinuxUiDispatcher();
+
+    public uint GetSystemDpi() => 96u;
+
+    public uint GetDpiForWindow(nint hwnd) => 96u;
+
+    public bool EnablePerMonitorDpiAwareness() => false;
+
+    public int GetSystemMetricsForDpi(int nIndex, uint dpi) => 0;
 
     public void Run(Application app, Window mainWindow)
         => throw new PlatformNotSupportedException("Linux platform host is not implemented yet. (X11/Wayland + rendering backend work pending)");
@@ -27,4 +38,3 @@ public sealed class LinuxPlatformHost : IPlatformHost
 
     public void Dispose() { }
 }
-

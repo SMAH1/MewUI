@@ -364,7 +364,10 @@ internal sealed class Win32WindowBackend : IWindowBackend
 
         var element = Window.HitTest(pos);
         var args = new MouseWheelEventArgs(pos, new Point(screenX, screenY), delta, isHorizontal);
-        element?.RaiseMouseWheel(args);
+
+        // Bubble to parents until handled (ScrollViewer etc.).
+        for (var current = element; current != null && !args.Handled; current = current.Parent as UIElement)
+            current.RaiseMouseWheel(args);
 
         return 0;
     }

@@ -1,5 +1,3 @@
-using Aprillz.MewUI.Native;
-
 namespace Aprillz.MewUI.Core;
 
 /// <summary>
@@ -7,11 +5,6 @@ namespace Aprillz.MewUI.Core;
 /// </summary>
 public static class DpiHelper
 {
-    /// <summary>
-    /// Per-Monitor DPI Awareness V2 context.
-    /// </summary>
-    public static readonly nint DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
-
     private const double DefaultDpi = 96.0;
 
     /// <summary>
@@ -19,26 +12,29 @@ public static class DpiHelper
     /// Call this at the start of the application.
     /// </summary>
     public static bool EnablePerMonitorDpiAwareness()
-        => OperatingSystem.IsWindows() && User32.SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        => Application.IsRunning
+            ? Application.Current.PlatformHost.EnablePerMonitorDpiAwareness()
+            : OperatingSystem.IsWindows(); // best-effort (caller should invoke after platform registration)
 
     /// <summary>
     /// Gets the DPI for a specific window.
     /// </summary>
     public static uint GetDpiForWindow(nint hwnd)
     {
-        if (!OperatingSystem.IsWindows())
-            return GetSystemDpi();
-
         if (hwnd == 0)
             return GetSystemDpi();
 
-        return User32.GetDpiForWindow(hwnd);
+        if (Application.IsRunning)
+            return Application.Current.PlatformHost.GetDpiForWindow(hwnd);
+
+        return GetSystemDpi();
     }
 
     /// <summary>
     /// Gets the system DPI.
     /// </summary>
-    public static uint GetSystemDpi() => OperatingSystem.IsWindows() ? User32.GetDpiForSystem() : 96u;
+    public static uint GetSystemDpi()
+        => Application.IsRunning ? Application.Current.PlatformHost.GetSystemDpi() : 96u;
 
     /// <summary>
     /// Gets the scale factor for a specific window (DPI / 96).
@@ -84,5 +80,5 @@ public static class DpiHelper
     /// Gets a system metric scaled for the given DPI.
     /// </summary>
     public static int GetSystemMetricsForDpi(int nIndex, uint dpi)
-        => OperatingSystem.IsWindows() ? User32.GetSystemMetricsForDpi(nIndex, dpi) : 0;
+        => Application.IsRunning ? Application.Current.PlatformHost.GetSystemMetricsForDpi(nIndex, dpi) : 0;
 }

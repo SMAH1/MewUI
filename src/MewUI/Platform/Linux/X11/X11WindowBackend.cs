@@ -384,7 +384,11 @@ internal sealed class X11WindowBackend : IWindowBackend
             if (!isDown)
                 return;
             int delta = e.button == 4 ? 120 : -120;
-            element.RaiseMouseWheel(new MouseWheelEventArgs(pos, pos, delta, isHorizontal: false));
+            var wheelArgs = new MouseWheelEventArgs(pos, pos, delta, isHorizontal: false);
+
+            // Bubble to parents until handled (ScrollViewer etc.).
+            for (var current = element; current != null && !wheelArgs.Handled; current = current.Parent as UIElement)
+                current.RaiseMouseWheel(wheelArgs);
             return;
         }
 

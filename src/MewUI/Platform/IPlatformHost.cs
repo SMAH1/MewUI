@@ -7,9 +7,19 @@ public interface IPlatformHost : IDisposable
 {
     IMessageBoxService MessageBox { get; }
 
+    IClipboardService Clipboard { get; }
+
     IWindowBackend CreateWindowBackend(Window window);
 
     IUiDispatcher CreateDispatcher(nint windowHandle);
+
+    uint GetSystemDpi();
+
+    uint GetDpiForWindow(nint hwnd);
+
+    bool EnablePerMonitorDpiAwareness();
+
+    int GetSystemMetricsForDpi(int nIndex, uint dpi);
 
     void Run(Application app, Window mainWindow);
 
