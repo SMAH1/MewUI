@@ -3,7 +3,7 @@ using Aprillz.MewUI.Rendering;
 
 namespace Aprillz.MewUI.Core;
 
-public sealed class Theme
+public record class Theme
 {
     public static Theme Light { get; } = CreateLight();
     public static Theme Dark { get; } = CreateDark();
@@ -25,7 +25,7 @@ public sealed class Theme
 
     public static Action<Theme, Theme>? CurrentChanged { get; set; }
 
-    public string Name { get; }
+    public string Name { get; init; }
 
     public Palette Palette { get; }
 
@@ -49,19 +49,19 @@ public sealed class Theme
     public Color TextBoxDisabledBackground => Palette.TextBoxDisabledBackground;
     public Color FocusRect => Palette.FocusRect;
 
-    public double ControlCornerRadius { get; }
+    public double ControlCornerRadius { get; init; }
 
-    public string FontFamily { get; }
-    public double FontSize { get; }
-    public FontWeight FontWeight { get; }
+    public string FontFamily { get; init; }
+    public double FontSize { get; init; }
+    public FontWeight FontWeight { get; init; }
 
     // Scroll (thin style defaults)
-    public double ScrollBarThickness { get; }
-    public double ScrollBarHitThickness { get; }
-    public double ScrollBarMinThumbLength { get; }
-    public double ScrollWheelStep { get; }
-    public double ScrollBarSmallChange { get; }
-    public double ScrollBarLargeChange { get; }
+    public double ScrollBarThickness { get; init; }
+    public double ScrollBarHitThickness { get; init; }
+    public double ScrollBarMinThumbLength { get; init; }
+    public double ScrollWheelStep { get; init; }
+    public double ScrollBarSmallChange { get; init; }
+    public double ScrollBarLargeChange { get; init; }
     public Color ScrollBarThumb => Palette.ScrollBarThumb;
     public Color ScrollBarThumbHover => Palette.ScrollBarThumbHover;
     public Color ScrollBarThumbActive => Palette.ScrollBarThumbActive;
