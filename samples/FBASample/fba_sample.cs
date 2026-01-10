@@ -208,7 +208,14 @@ Element NormalControls() => new StackPanel()
                     .Children(
                         new Button()
                             .Content("Click!")
-                            .OnClick(() => MessageBox.Show(window.Handle, "Button clicked!", "Aprillz.MewUI Demo", MessageBoxButtons.Ok, MessageBoxIcon.Information)),
+                            .OnClick(() => new Window()
+                                .Fixed(400, 600)
+                                .Title("New Window")
+                                .Content(
+                                    BindSamples()
+                                        .Margin(12)
+                                )
+                                .Show()),
 
                         new Button()
                             .Content("Disabled")
@@ -228,17 +235,17 @@ Element NormalControls() => new StackPanel()
                     .BindText(vm.AsyncStatus)
                     .Margin(0, 0, 0, 6),
 
-                new Label() 
-                    .Text("Options") 
-                    .Bold(), 
- 
+                new Label()
+                    .Text("Options")
+                    .Bold(),
+
                 new StackPanel()
                     .Vertical()
                     .Spacing(6)
                     .Children(
                         new CheckBox()
                             .Text("Enable feature"),
- 
+
                         new StackPanel()
                             .Horizontal()
                             .Spacing(12)
@@ -252,7 +259,7 @@ Element NormalControls() => new StackPanel()
                                     .Text("B")
                                     .GroupName("group1")
                             ),
- 
+
                         new StackPanel()
                             .Horizontal()
                             .Spacing(12)
@@ -266,7 +273,7 @@ Element NormalControls() => new StackPanel()
                                     .Text("D")
                                     .GroupName("group2")
                             ),
- 
+
                         new StackPanel()
                             .Horizontal()
                             .Spacing(12)
@@ -279,10 +286,10 @@ Element NormalControls() => new StackPanel()
                                     .Text("Y")
                             )
                     ),
- 
-            new ListBox() 
-                .Items("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth") 
-                .SelectedIndex(1) 
+
+            new ListBox()
+                .Items("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth")
+                .SelectedIndex(1)
                 .Height(76),
 
             new DockPanel()
@@ -299,7 +306,7 @@ Element NormalControls() => new StackPanel()
                 )
         ));
 
-Element BindSamples()
+FrameworkElement BindSamples()
 {
     var selectionItemCount = new ObservableValue<int>(4);
 
@@ -312,7 +319,7 @@ Element BindSamples()
                 .Bold(),
 
             new Grid()
-                .Rows("Auto,Auto,Auto,*")
+                .Rows("Auto,Auto,Auto,Auto,*")
                 .Columns("100,*")
                 .Spacing(8)
                 .AutoIndexing()
