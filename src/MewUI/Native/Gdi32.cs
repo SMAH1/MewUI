@@ -229,6 +229,10 @@ internal static partial class Gdi32
     [LibraryImport(LibraryName)]
     public static partial int SetStretchBltMode(nint hdc, int mode);
 
+    [LibraryImport(LibraryName)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetBrushOrgEx(nint hdc, int x, int y, out Structs.POINT lppt);
+
     #endregion
 
     #region Clipping

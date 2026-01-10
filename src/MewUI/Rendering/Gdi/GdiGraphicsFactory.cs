@@ -1,11 +1,13 @@
 using Aprillz.MewUI.Core;
+using Aprillz.MewUI.Resources;
+using Aprillz.MewUI.Rendering;
 
 namespace Aprillz.MewUI.Rendering.Gdi;
 
 /// <summary>
 /// GDI graphics factory implementation.
 /// </summary>
-public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleaser
+public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleaser, IImageScaleQualityController
 {
     public GraphicsBackend Backend => GraphicsBackend.Gdi;
 
@@ -19,6 +21,8 @@ public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleas
     public bool IsDoubleBuffered { get; set; } = true;
 
     public GdiCurveQuality CurveQuality { get; set; } = GdiCurveQuality.Supersample2x;
+
+    public ImageScaleQuality ImageScaleQuality { get; set; } = ImageScaleQuality.HighQuality;
 
     public IFont CreateFont(string family, double size, FontWeight weight = FontWeight.Normal,
         bool italic = false, bool underline = false, bool strikethrough = false)
@@ -34,14 +38,13 @@ public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleas
         bool italic = false, bool underline = false, bool strikethrough = false) => new GdiFont(family, size, weight, italic, underline, strikethrough, dpi);
 
     public IImage CreateImageFromFile(string path) =>
-        // For simplicity, we'll use a basic implementation
-        // In a full implementation, you'd use WIC or another library to load images
-        throw new NotImplementedException("Image loading from file is not yet implemented. Use CreateImageFromBytes instead.");
+        CreateImageFromBytes(File.ReadAllBytes(path));
 
     public IImage CreateImageFromBytes(byte[] data) =>
-        // This expects raw BGRA pixel data
-        // In a full implementation, you'd parse the image format
-        throw new NotImplementedException("Image loading from bytes is not yet implemented.");
+        ImageDecoders.TryDecode(data, out var bmp)
+            ? CreateImage(bmp.WidthPx, bmp.HeightPx, bmp.Data)
+            : throw new NotSupportedException(
+                $"Unsupported image format. Built-in decoders: BMP/PNG/JPEG. Detected: {ImageDecoders.DetectFormat(data)}.");
 
     /// <summary>
     /// Creates an empty 32-bit ARGB image.
@@ -55,8 +58,8 @@ public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleas
 
     public IGraphicsContext CreateContext(nint hwnd, nint hdc, double dpiScale)
         => IsDoubleBuffered
-        ? new GdiDoubleBufferedContext(hwnd, hdc, dpiScale, CurveQuality)
-        : new GdiGraphicsContext(hwnd, hdc, dpiScale, CurveQuality);
+        ? new GdiDoubleBufferedContext(hwnd, hdc, dpiScale, CurveQuality, ImageScaleQuality)
+        : new GdiGraphicsContext(hwnd, hdc, dpiScale, CurveQuality, ImageScaleQuality);
 
 
     public IGraphicsContext CreateMeasurementContext(uint dpi)

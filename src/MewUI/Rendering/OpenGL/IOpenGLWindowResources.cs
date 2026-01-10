@@ -6,10 +6,11 @@ internal interface IOpenGLWindowResources : IDisposable
 
     OpenGLTextCache TextCache { get; }
 
+    void TrackTexture(uint textureId);
+
     void MakeCurrent(nint deviceOrDisplay);
 
     void ReleaseCurrent();
 
     void SwapBuffers(nint deviceOrDisplay, nint nativeWindow);
 }
-

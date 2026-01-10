@@ -3,6 +3,7 @@ using Aprillz.MewUI.Native.Constants;
 using Aprillz.MewUI.Native.Structs;
 using Aprillz.MewUI.Core;
 using Aprillz.MewUI.Primitives;
+using Aprillz.MewUI.Rendering;
 using System.Diagnostics;
 using System.IO;
 
@@ -16,6 +17,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
     private readonly nint _hwnd;
     private readonly bool _ownsDc;
     private readonly GdiCurveQuality _curveQuality;
+    private readonly ImageScaleQuality _imageScaleQuality;
     private readonly int _supersampleFactor;
     private readonly Stack<int> _savedStates = new();
     private double _translateX;
@@ -32,13 +34,14 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
 
     internal nint Hdc { get; }
 
-    public GdiGraphicsContext(nint hwnd, nint hdc, double dpiScale, GdiCurveQuality curveQuality, bool ownsDc = false)
+    public GdiGraphicsContext(nint hwnd, nint hdc, double dpiScale, GdiCurveQuality curveQuality, ImageScaleQuality imageScaleQuality, bool ownsDc = false)
     {
         _hwnd = hwnd;
         Hdc = hdc;
         _ownsDc = ownsDc;
         DpiScale = dpiScale;
         _curveQuality = curveQuality;
+        _imageScaleQuality = imageScaleQuality;
         _supersampleFactor = (int)curveQuality switch { 2 => 2, 3 => 3, _ => 1 };
 
         // Set default modes
@@ -424,31 +427,76 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
         if (image is not GdiImage gdiImage)
             throw new ArgumentException("Image must be a GdiImage", nameof(image));
 
+        var destPx = ToDeviceRect(destRect);
+        if (destPx.Width <= 0 || destPx.Height <= 0)
+            return;
+
         var memDc = Gdi32.CreateCompatibleDC(Hdc);
         var oldBitmap = Gdi32.SelectObject(memDc, gdiImage.Handle);
+
+        // Improve image scaling quality when stretching (especially downsizing).
+        // Note: HALFTONE can be noticeably slower, so allow a fast mode (used during interactive resize).
+        int mode = _imageScaleQuality == ImageScaleQuality.HighQuality ? GdiConstants.HALFTONE : GdiConstants.COLORONCOLOR;
+        int oldStretchMode = Gdi32.SetStretchBltMode(Hdc, mode);
+        bool hasBrushOrg = mode == GdiConstants.HALFTONE;
+        var oldBrushOrg = default(POINT);
+        if (hasBrushOrg)
+            Gdi32.SetBrushOrgEx(Hdc, 0, 0, out oldBrushOrg);
+
         try
         {
-            var dest = ToDeviceRect(destRect);
             int srcX = (int)sourceRect.X;
             int srcY = (int)sourceRect.Y;
             int srcW = (int)sourceRect.Width;
             int srcH = (int)sourceRect.Height;
 
+            // If this is a pure downscale and we want high quality, pre-scale once into a DIB section
+            // and then blit 1:1. This improves both quality and steady-state performance.
+            if (_imageScaleQuality == ImageScaleQuality.HighQuality &&
+                destPx.Width < srcW && destPx.Height < srcH &&
+                IsNearInt(sourceRect.X) && IsNearInt(sourceRect.Y) && IsNearInt(sourceRect.Width) && IsNearInt(sourceRect.Height) &&
+                gdiImage.TryGetOrCreateScaledBitmap(srcX, srcY, srcW, srcH, destPx.Width, destPx.Height, out var scaledBmp))
+            {
+                var scaledDc = Gdi32.CreateCompatibleDC(Hdc);
+                var oldScaled = Gdi32.SelectObject(scaledDc, scaledBmp);
+                try
+                {
+                    var blendScaled = BLENDFUNCTION.SourceOver(255);
+                    Gdi32.AlphaBlend(
+                        Hdc, destPx.left, destPx.top, destPx.Width, destPx.Height,
+                        scaledDc, 0, 0, destPx.Width, destPx.Height,
+                        blendScaled);
+                }
+                finally
+                {
+                    Gdi32.SelectObject(scaledDc, oldScaled);
+                    Gdi32.DeleteDC(scaledDc);
+                }
+
+                return;
+            }
+
             // Use alpha blending for 32-bit images
             var blend = BLENDFUNCTION.SourceOver(255);
             Gdi32.AlphaBlend(
-                Hdc, dest.left, dest.top, dest.Width, dest.Height,
+                Hdc, destPx.left, destPx.top, destPx.Width, destPx.Height,
                 memDc, srcX, srcY, srcW, srcH,
                 blend);
         }
         finally
         {
+            if (oldStretchMode != 0)
+                Gdi32.SetStretchBltMode(Hdc, oldStretchMode);
+            if (hasBrushOrg)
+                Gdi32.SetBrushOrgEx(Hdc, oldBrushOrg.x, oldBrushOrg.y, out _);
             Gdi32.SelectObject(memDc, oldBitmap);
             Gdi32.DeleteDC(memDc);
         }
     }
 
     #endregion
+
+    private static bool IsNearInt(double value) => Math.Abs(value - Math.Round(value)) <= 0.0001;
 
     #region Helper Methods
 

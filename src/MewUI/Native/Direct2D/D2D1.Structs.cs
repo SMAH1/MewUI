@@ -42,6 +42,14 @@ internal readonly struct D2D1_PIXEL_FORMAT(uint format, D2D1_ALPHA_MODE alphaMod
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal readonly struct D2D1_BITMAP_PROPERTIES(D2D1_PIXEL_FORMAT pixelFormat, float dpiX, float dpiY)
+{
+    public readonly D2D1_PIXEL_FORMAT pixelFormat = pixelFormat;
+    public readonly float dpiX = dpiX;
+    public readonly float dpiY = dpiY;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal readonly struct D2D1_RENDER_TARGET_PROPERTIES(
     D2D1_RENDER_TARGET_TYPE type,
     D2D1_PIXEL_FORMAT pixelFormat,

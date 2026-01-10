@@ -9,6 +9,7 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
 {
     private readonly nint _display;
     private readonly nint _window;
+    private readonly HashSet<uint> _textures = new();
     private bool _disposed;
 
     public nint GlxContext { get; }
@@ -115,6 +116,15 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
     public void SwapBuffers(nint deviceOrDisplay, nint nativeWindow)
         => LibGL.glXSwapBuffers(deviceOrDisplay, nativeWindow);
 
+    public void TrackTexture(uint textureId)
+    {
+        if (textureId == 0)
+            return;
+        if (_disposed)
+            return;
+        _textures.Add(textureId);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -122,6 +132,12 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
         _disposed = true;
 
         MakeCurrent(_display);
+        foreach (var tex in _textures)
+        {
+            uint t = tex;
+            GL.DeleteTextures(1, ref t);
+        }
+        _textures.Clear();
         TextCache.Dispose();
         ReleaseCurrent();
 

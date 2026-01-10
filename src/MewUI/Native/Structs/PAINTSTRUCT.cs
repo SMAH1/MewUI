@@ -10,5 +10,5 @@ internal unsafe struct PAINTSTRUCT
     public RECT rcPaint;
     public int fRestore;
     public int fIncUpdate;
-    public fixed byte rgbReserved[32];
+    public Byte32 rgbReserved;
 }

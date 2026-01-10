@@ -4,6 +4,7 @@ using Aprillz.MewUI.Core;
 using Aprillz.MewUI.Native.Structs;
 using Aprillz.MewUI.Rendering.Gdi;
 using Aprillz.MewUI.Rendering.FreeType;
+using Aprillz.MewUI.Resources;
 
 namespace Aprillz.MewUI.Rendering.OpenGL;
 
@@ -47,10 +48,13 @@ public sealed class OpenGLGraphicsFactory : IGraphicsFactory, IWindowResourceRel
     }
 
     public IImage CreateImageFromFile(string path) =>
-        throw new NotImplementedException("Image loading is not implemented yet.");
+        CreateImageFromBytes(File.ReadAllBytes(path));
 
     public IImage CreateImageFromBytes(byte[] data) =>
-        throw new NotImplementedException("Image loading is not implemented yet.");
+        ImageDecoders.TryDecode(data, out var bmp)
+            ? new OpenGLImage(bmp.WidthPx, bmp.HeightPx, bmp.Data)
+            : throw new NotSupportedException(
+                $"Unsupported image format. Built-in decoders: BMP/PNG. Detected: {ImageDecoders.DetectFormat(data)}.");
 
     public IGraphicsContext CreateContext(nint hwnd, nint hdc, double dpiScale)
     {

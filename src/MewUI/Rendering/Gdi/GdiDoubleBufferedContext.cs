@@ -1,5 +1,6 @@
 using Aprillz.MewUI.Native;
 using Aprillz.MewUI.Primitives;
+using Aprillz.MewUI.Rendering;
 
 namespace Aprillz.MewUI.Rendering.Gdi;
 
@@ -109,7 +110,7 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
 
     public static void ReleaseForWindow(nint hwnd) => BackBuffer.Release(hwnd);
 
-    public GdiDoubleBufferedContext(nint hwnd, nint screenDc, double dpiScale, GdiCurveQuality curveQuality)
+    public GdiDoubleBufferedContext(nint hwnd, nint screenDc, double dpiScale, GdiCurveQuality curveQuality, ImageScaleQuality imageScaleQuality)
     {
         _hwnd = hwnd;
         _screenDc = screenDc;
@@ -125,7 +126,7 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
         _backBuffer = BackBuffer.GetOrCreate(hwnd, screenDc, _width, _height);
 
         // Create the inner context that renders to the memory DC
-        _context = new GdiGraphicsContext(hwnd, _backBuffer.MemDc, dpiScale, curveQuality, false);
+        _context = new GdiGraphicsContext(hwnd, _backBuffer.MemDc, dpiScale, curveQuality, imageScaleQuality, false);
     }
 
     public void Dispose()

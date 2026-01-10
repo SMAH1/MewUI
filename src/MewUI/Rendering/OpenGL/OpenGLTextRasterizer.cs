@@ -8,10 +8,10 @@ using Aprillz.MewUI.Rendering.Gdi;
 
 namespace Aprillz.MewUI.Rendering.OpenGL;
 
-internal readonly record struct OpenGLTextBitmap(int WidthPx, int HeightPx, byte[] Data);
-
 internal static class OpenGLTextRasterizer
 {
+    private static readonly byte[] EmptyPixel = new byte[4];
+
     public static OpenGLTextBitmap Rasterize(
         nint hdcWindow,
         GdiFont font,
@@ -28,7 +28,7 @@ internal static class OpenGLTextRasterizer
 
         nint memDc = Gdi32.CreateCompatibleDC(hdcWindow);
         if (memDc == 0)
-            return new OpenGLTextBitmap(1, 1, new byte[4]);
+            return new OpenGLTextBitmap(1, 1, EmptyPixel);
 
         try
         {
@@ -36,7 +36,7 @@ internal static class OpenGLTextRasterizer
             nint bits;
             nint dib = Gdi32.CreateDIBSection(memDc, ref bmi, GdiConstants.DIB_RGB_COLORS, out bits, 0, 0);
             if (dib == 0 || bits == 0)
-                return new OpenGLTextBitmap(1, 1, new byte[4]);
+                return new OpenGLTextBitmap(1, 1, EmptyPixel);
 
             nint oldBmp = Gdi32.SelectObject(memDc, dib);
             nint oldFont = Gdi32.SelectObject(memDc, font.Handle);
@@ -131,18 +131,5 @@ internal static class OpenGLTextRasterizer
             bgra[i + 2] = r;
             bgra[i + 3] = (byte)a;
         }
-    }
-
-    public static byte[] ConvertBgraToRgba(byte[] bgra)
-    {
-        var rgba = new byte[bgra.Length];
-        for (int i = 0; i < bgra.Length; i += 4)
-        {
-            rgba[i] = bgra[i + 2];
-            rgba[i + 1] = bgra[i + 1];
-            rgba[i + 2] = bgra[i];
-            rgba[i + 3] = bgra[i + 3];
-        }
-        return rgba;
     }
 }

@@ -15,6 +15,11 @@ internal unsafe struct ID2D1RenderTarget
     public void** lpVtbl;
 }
 
+internal unsafe struct ID2D1Bitmap
+{
+    public void** lpVtbl;
+}
+
 internal static unsafe class D2D1VTable
 {
     private const int CreateHwndRenderTargetIndex = 14;
@@ -167,6 +172,14 @@ internal static unsafe class D2D1VTable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void SetTextAntialiasMode(ID2D1RenderTarget* rt, D2D1_TEXT_ANTIALIAS_MODE mode)
+    {
+        // Layout per d2d1.h: SetTextAntialiasMode comes after Set/GetAntialiasMode, before Set/GetTextRenderingParams.
+        var fn = (delegate* unmanaged[Stdcall]<ID2D1RenderTarget*, D2D1_TEXT_ANTIALIAS_MODE, void>)rt->lpVtbl[34];
+        fn(rt, mode);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void DrawText(ID2D1RenderTarget* rt, string text, nint textFormat, in D2D1_RECT_F layoutRect, nint brush)
     {
         if (string.IsNullOrEmpty(text))
@@ -183,8 +196,44 @@ internal static unsafe class D2D1VTable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static RECT GetClientRect(nint hwnd)
     {
-        Aprillz.MewUI.Native.User32.GetClientRect(hwnd, out var rc);
+        User32.GetClientRect(hwnd, out var rc);
         return rc;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int CreateBitmap(
+        ID2D1RenderTarget* rt,
+        D2D1_SIZE_U size,
+        nint srcData,
+        uint pitch,
+        in D2D1_BITMAP_PROPERTIES props,
+        out nint bitmap)
+    {
+        nint bmp = 0;
+        fixed (D2D1_BITMAP_PROPERTIES* pProps = &props)
+        {
+            var fn = (delegate* unmanaged[Stdcall]<ID2D1RenderTarget*, D2D1_SIZE_U, nint, uint, D2D1_BITMAP_PROPERTIES*, nint*, int>)rt->lpVtbl[4];
+            int hr = fn(rt, size, srcData, pitch, pProps, &bmp);
+            bitmap = bmp;
+            return hr;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void DrawBitmap(
+        ID2D1RenderTarget* rt,
+        nint bitmap,
+        in D2D1_RECT_F destRect,
+        float opacity,
+        D2D1_BITMAP_INTERPOLATION_MODE interpolationMode,
+        in D2D1_RECT_F srcRect)
+    {
+        fixed (D2D1_RECT_F* pDest = &destRect)
+        fixed (D2D1_RECT_F* pSrc = &srcRect)
+        {
+            var fn = (delegate* unmanaged[Stdcall]<ID2D1RenderTarget*, nint, D2D1_RECT_F*, float, D2D1_BITMAP_INTERPOLATION_MODE, D2D1_RECT_F*, void>)rt->lpVtbl[26];
+            fn(rt, bitmap, pDest, opacity, interpolationMode, pSrc);
+        }
     }
 }
 

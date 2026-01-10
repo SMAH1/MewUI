@@ -9,6 +9,7 @@ namespace Aprillz.MewUI.Rendering.OpenGL;
 internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
 {
     private readonly nint _hwnd;
+    private readonly HashSet<uint> _textures = new();
     private bool _disposed;
 
     public nint Hglrc { get; }
@@ -227,6 +228,15 @@ internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
     public void SwapBuffers(nint deviceOrDisplay, nint nativeWindow)
         => Gdi32.SwapBuffers(deviceOrDisplay);
 
+    public void TrackTexture(uint textureId)
+    {
+        if (textureId == 0)
+            return;
+        if (_disposed)
+            return;
+        _textures.Add(textureId);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -240,6 +250,12 @@ internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
         try
         {
             MakeCurrent(hdc);
+            foreach (var tex in _textures)
+            {
+                uint t = tex;
+                GL.DeleteTextures(1, ref t);
+            }
+            _textures.Clear();
             TextCache.Dispose();
             ReleaseCurrent();
         }

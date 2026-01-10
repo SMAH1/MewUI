@@ -21,8 +21,21 @@ internal readonly record struct OpenGLTextureEntry(uint TextureId, int WidthPx, 
 
 internal sealed class OpenGLTextCache : IDisposable
 {
-    private readonly Dictionary<OpenGLTextCacheKey, OpenGLTextureEntry> _textures = new();
+    // Resizing can generate many unique (text,width,height) combinations. Without eviction this can balloon
+    // GPU memory / committed memory quickly (often observed as Private Bytes spikes).
+    private const long DefaultMaxBytes = 16L * 1024 * 1024; // 128 MiB
+
+    private readonly Dictionary<OpenGLTextCacheKey, LinkedListNode<CacheEntry>> _map = new();
+    private readonly LinkedList<CacheEntry> _lru = new();
+    private long _currentBytes;
+    private long _maxBytes = DefaultMaxBytes;
     private bool _disposed;
+
+    public long MaxBytes
+    {
+        get => _maxBytes;
+        set => _maxBytes = Math.Max(0, value);
+    }
 
     public OpenGLTextureEntry GetOrCreateTexture(
         bool supportsBgra,
@@ -33,13 +46,24 @@ internal sealed class OpenGLTextCache : IDisposable
         if (_disposed)
             throw new ObjectDisposedException(nameof(OpenGLTextCache));
 
-        if (_textures.TryGetValue(key, out var entry))
-            return entry;
+        if (_map.TryGetValue(key, out var node))
+        {
+            _lru.Remove(node);
+            _lru.AddFirst(node);
+            return node.Value.Entry;
+        }
 
         var bmp = factory();
         uint tex = UploadTexture(supportsBgra, bmp);
-        entry = new OpenGLTextureEntry(tex, bmp.WidthPx, bmp.HeightPx);
-        _textures[key] = entry;
+        var entry = new OpenGLTextureEntry(tex, bmp.WidthPx, bmp.HeightPx);
+
+        long bytes = EstimateBytes(bmp.WidthPx, bmp.HeightPx);
+        var newNode = new LinkedListNode<CacheEntry>(new CacheEntry(key, entry, bytes));
+        _lru.AddFirst(newNode);
+        _map[key] = newNode;
+        _currentBytes += bytes;
+
+        EvictIfNeeded();
         return entry;
     }
 
@@ -58,7 +82,7 @@ internal sealed class OpenGLTextCache : IDisposable
 
         // If BGRA is not supported, we convert.
         if (!supportsBgra)
-            data = OpenGLTextRasterizer.ConvertBgraToRgba(data);
+            data = OpenGLPixelUtils.ConvertBgraToRgba(data);
 
         unsafe
         {
@@ -72,18 +96,61 @@ internal sealed class OpenGLTextCache : IDisposable
         return tex;
     }
 
+    private static long EstimateBytes(int widthPx, int heightPx)
+    {
+        if (widthPx <= 0 || heightPx <= 0)
+            return 0;
+        return (long)widthPx * heightPx * 4;
+    }
+
+    private void EvictIfNeeded()
+    {
+        if (_maxBytes <= 0)
+        {
+            Clear();
+            return;
+        }
+
+        while (_currentBytes > _maxBytes && _lru.Last is { } last)
+        {
+            _lru.RemoveLast();
+            _map.Remove(last.Value.Key);
+
+            uint tex = last.Value.Entry.TextureId;
+            if (tex != 0)
+                GL.DeleteTextures(1, ref tex);
+
+            _currentBytes -= last.Value.Bytes;
+        }
+    }
+
+    public void Clear()
+    {
+        if (_disposed)
+            return;
+
+        var node = _lru.First;
+        while (node != null)
+        {
+            uint tex = node.Value.Entry.TextureId;
+            if (tex != 0)
+                GL.DeleteTextures(1, ref tex);
+            node = node.Next;
+        }
+
+        _lru.Clear();
+        _map.Clear();
+        _currentBytes = 0;
+    }
+
     public void Dispose()
     {
         if (_disposed)
             return;
         _disposed = true;
 
-        foreach (var kvp in _textures)
-        {
-            uint tex = kvp.Value.TextureId;
-            GL.DeleteTextures(1, ref tex);
-        }
-
-        _textures.Clear();
+        Clear();
     }
+
+    private readonly record struct CacheEntry(OpenGLTextCacheKey Key, OpenGLTextureEntry Entry, long Bytes);
 }

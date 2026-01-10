@@ -10,6 +10,8 @@ namespace Aprillz.MewUI.Rendering.FreeType;
 
 internal static unsafe class FreeTypeText
 {
+    private static readonly byte[] EmptyPixel = new byte[4];
+
     public static Size Measure(string text, FreeTypeFont font)
     {
         if (string.IsNullOrEmpty(text))
@@ -60,7 +62,7 @@ internal static unsafe class FreeTypeText
         TextWrapping wrapping)
     {
         if (string.IsNullOrEmpty(text))
-            return new OpenGLTextBitmap(1, 1, new byte[4]);
+            return new OpenGLTextBitmap(1, 1, EmptyPixel);
 
         widthPx = Math.Max(1, widthPx);
         heightPx = Math.Max(1, heightPx);

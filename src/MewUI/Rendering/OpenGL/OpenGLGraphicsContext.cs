@@ -597,15 +597,75 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         GL.End();
     }
 
-    #endregion
+#endregion
 
     #region Image Rendering
 
-    public void DrawImage(IImage image, Point location) => throw new NotImplementedException();
+    public void DrawImage(IImage image, Point location)
+    {
+        if (image == null)
+            throw new ArgumentNullException(nameof(image));
 
-    public void DrawImage(IImage image, Rect destRect) => throw new NotImplementedException();
+        var dest = new Rect(location.X, location.Y, image.PixelWidth, image.PixelHeight);
+        DrawImage(image, dest);
+    }
 
-    public void DrawImage(IImage image, Rect destRect, Rect sourceRect) => throw new NotImplementedException();
+    public void DrawImage(IImage image, Rect destRect)
+    {
+        if (image == null)
+            throw new ArgumentNullException(nameof(image));
+
+        if (image is not OpenGLImage glImage)
+            throw new ArgumentException("Image must be an OpenGLImage.", nameof(image));
+
+        uint tex = glImage.GetOrCreateTexture(_resources, _hwnd);
+        if (tex == 0)
+            return;
+
+        var dst = ToDeviceRect(destRect);
+        if (dst.Width <= 0 || dst.Height <= 0)
+            return;
+
+        GL.BindTexture(GL.GL_TEXTURE_2D, tex);
+        GL.Color4ub(255, 255, 255, 255);
+        GL.Begin(GL.GL_QUADS);
+        GL.TexCoord2f(0, 0); GL.Vertex2f(dst.left, dst.top);
+        GL.TexCoord2f(1, 0); GL.Vertex2f(dst.right, dst.top);
+        GL.TexCoord2f(1, 1); GL.Vertex2f(dst.right, dst.bottom);
+        GL.TexCoord2f(0, 1); GL.Vertex2f(dst.left, dst.bottom);
+        GL.End();
+    }
+
+    public void DrawImage(IImage image, Rect destRect, Rect sourceRect)
+    {
+        if (image == null)
+            throw new ArgumentNullException(nameof(image));
+
+        if (image is not OpenGLImage glImage)
+            throw new ArgumentException("Image must be an OpenGLImage.", nameof(image));
+
+        uint tex = glImage.GetOrCreateTexture(_resources, _hwnd);
+        if (tex == 0)
+            return;
+
+        var dst = ToDeviceRect(destRect);
+        if (dst.Width <= 0 || dst.Height <= 0)
+            return;
+
+        double u0 = Math.Clamp(sourceRect.X / image.PixelWidth, 0, 1);
+        double v0 = Math.Clamp(sourceRect.Y / image.PixelHeight, 0, 1);
+        double u1 = Math.Clamp(sourceRect.Right / image.PixelWidth, 0, 1);
+        double v1 = Math.Clamp(sourceRect.Bottom / image.PixelHeight, 0, 1);
+
+        GL.BindTexture(GL.GL_TEXTURE_2D, tex);
+        GL.Color4ub(255, 255, 255, 255);
+        GL.Begin(GL.GL_QUADS);
+        GL.TexCoord2f((float)u0, (float)v0); GL.Vertex2f(dst.left, dst.top);
+        GL.TexCoord2f((float)u1, (float)v0); GL.Vertex2f(dst.right, dst.top);
+        GL.TexCoord2f((float)u1, (float)v1); GL.Vertex2f(dst.right, dst.bottom);
+        GL.TexCoord2f((float)u0, (float)v1); GL.Vertex2f(dst.left, dst.bottom);
+        GL.End();
+    }
 
     #endregion
 

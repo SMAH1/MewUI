@@ -1,54 +1,55 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using Aprillz.MewUI.Native.Com;
 using Aprillz.MewUI.Native.Direct2D;
 using Aprillz.MewUI.Native.DirectWrite;
 using Aprillz.MewUI.Primitives;
+using Aprillz.MewUI.Resources;
 
 namespace Aprillz.MewUI.Rendering.Direct2D;
 
-internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
-{
-    private readonly nint _hwnd;
-    private readonly nint _d2dFactory;
-    private readonly nint _dwriteFactory;
-
-    private nint _renderTarget; // ID2D1RenderTarget*
-    private readonly Dictionary<uint, nint> _solidBrushes = new();
-    private readonly Stack<(double tx, double ty, int clipDepth)> _states = new();
-    private double _translateX;
-    private double _translateY;
+internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext 
+{ 
+    private const int D2DERR_RECREATE_TARGET = unchecked((int)0x8899000C); 
+    private const int D2DERR_WRONG_RESOURCE_DOMAIN = unchecked((int)0x88990015);
+ 
+    private readonly nint _hwnd; 
+    private readonly nint _dwriteFactory; 
+    private readonly Action? _onRecreateTarget; 
+ 
+    private nint _renderTarget; // ID2D1RenderTarget* 
+    private readonly int _renderTargetGeneration;
+    private readonly Dictionary<uint, nint> _solidBrushes = new(); 
+    private readonly Stack<(double tx, double ty, int clipDepth)> _states = new(); 
+    private double _translateX; 
+    private double _translateY; 
     private int _clipDepth;
     private bool _disposed;
-
-    public double DpiScale { get; }
-
-    public Direct2DGraphicsContext(nint hwnd, double dpiScale, nint d2dFactory, nint dwriteFactory)
-    {
-        _hwnd = hwnd;
-        _d2dFactory = d2dFactory;
-        _dwriteFactory = dwriteFactory;
-        DpiScale = dpiScale;
-
-        CreateRenderTarget();
+ 
+    public double DpiScale { get; } 
+ 
+    public Direct2DGraphicsContext(nint hwnd, double dpiScale, nint renderTarget, int renderTargetGeneration, nint dwriteFactory, Action? onRecreateTarget) 
+    { 
+        _hwnd = hwnd; 
+        _dwriteFactory = dwriteFactory; 
+        _onRecreateTarget = onRecreateTarget; 
+        DpiScale = dpiScale; 
+ 
+        _renderTarget = renderTarget; 
+        _renderTargetGeneration = renderTargetGeneration;
         D2D1VTable.BeginDraw((ID2D1RenderTarget*)_renderTarget);
-    }
+        D2D1VTable.SetTextAntialiasMode((ID2D1RenderTarget*)_renderTarget, D2D1_TEXT_ANTIALIAS_MODE.CLEARTYPE);
+    } 
 
-    private void CreateRenderTarget()
+    [Conditional("DEBUG")]
+    private static void AssertHr(int hr, string op)
     {
-        var rc = D2D1VTable.GetClientRect(_hwnd);
-        uint w = (uint)Math.Max(1, rc.Width);
-        uint h = (uint)Math.Max(1, rc.Height);
+        if (hr >= 0)
+            return;
 
-        var pixelFormat = new D2D1_PIXEL_FORMAT(0, D2D1_ALPHA_MODE.PREMULTIPLIED);
-        var rtProps = new D2D1_RENDER_TARGET_PROPERTIES(D2D1_RENDER_TARGET_TYPE.DEFAULT, pixelFormat, 0, 0, 0, 0);
-        var hwndProps = new D2D1_HWND_RENDER_TARGET_PROPERTIES(_hwnd, new D2D1_SIZE_U(w, h), D2D1_PRESENT_OPTIONS.NONE);
-
-        int hr = D2D1VTable.CreateHwndRenderTarget((ID2D1Factory*)_d2dFactory, ref rtProps, ref hwndProps, out _renderTarget);
-        if (hr < 0 || _renderTarget == 0)
-            throw new InvalidOperationException($"CreateHwndRenderTarget failed: 0x{hr:X8}");
-
-        float dpi = (float)(96.0 * DpiScale);
-        D2D1VTable.SetDpi((ID2D1RenderTarget*)_renderTarget, dpi, dpi);
+        string msg = $"Direct2D: {op} failed: 0x{hr:X8}";
+        Debug.Fail(msg);
+        ImageDecoders.DebugLog?.Invoke(msg);
     }
 
     public void Dispose()
@@ -66,7 +67,10 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
                     _clipDepth--;
                 }
 
-                D2D1VTable.EndDraw((ID2D1RenderTarget*)_renderTarget);
+                int hr = D2D1VTable.EndDraw((ID2D1RenderTarget*)_renderTarget);
+                AssertHr(hr, "EndDraw");
+                if (hr == D2DERR_RECREATE_TARGET || hr == D2DERR_WRONG_RESOURCE_DOMAIN)
+                    _onRecreateTarget?.Invoke();
             }
         }
         finally
@@ -75,7 +79,6 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
                 ComHelpers.Release(brush);
             _solidBrushes.Clear();
 
-            ComHelpers.Release(_renderTarget);
             _renderTarget = 0;
             _disposed = true;
         }
@@ -313,13 +316,35 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
     }
 
     public void DrawImage(IImage image, Point location) =>
-        throw new NotImplementedException("Direct2D image rendering is not implemented yet.");
+        DrawImage(image, new Rect(location.X, location.Y, image.PixelWidth, image.PixelHeight));
 
     public void DrawImage(IImage image, Rect destRect) =>
-        throw new NotImplementedException("Direct2D image rendering is not implemented yet.");
+        DrawImage(image, destRect, new Rect(0, 0, image.PixelWidth, image.PixelHeight));
 
     public void DrawImage(IImage image, Rect destRect, Rect sourceRect) =>
-        throw new NotImplementedException("Direct2D image rendering is not implemented yet.");
+        DrawImageCore(
+            image as Direct2DImage ?? throw new ArgumentException("Image must be a Direct2DImage", nameof(image)),
+            destRect,
+            sourceRect);
+
+    private void DrawImageCore(Direct2DImage image, Rect destRect, Rect sourceRect)
+    {
+        if (_renderTarget == 0)
+            return;
+
+        nint bmp = image.GetOrCreateBitmap(_renderTarget, _renderTargetGeneration);
+        if (bmp == 0)
+            return;
+
+        var dst = ToRectF(destRect);
+        var src = new D2D1_RECT_F(
+            left: (float)sourceRect.X,
+            top: (float)sourceRect.Y,
+            right: (float)sourceRect.Right,
+            bottom: (float)sourceRect.Bottom);
+
+        D2D1VTable.DrawBitmap((ID2D1RenderTarget*)_renderTarget, bmp, dst, opacity: 1.0f, D2D1_BITMAP_INTERPOLATION_MODE.LINEAR, src);
+    }
 
     private nint GetSolidBrush(Color color)
     {

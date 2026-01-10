@@ -1,7 +1,9 @@
 using Aprillz.MewUI.Primitives;
-using Aprillz.MewUI.Rendering.FreeType;
 
 namespace Aprillz.MewUI.Rendering.OpenGL;
+ 
+
+using Aprillz.MewUI.Rendering.FreeType;
 
 /// <summary>
 /// Temporary, cross-platform measurement context for Linux bring-up.
@@ -94,4 +96,4 @@ internal sealed class OpenGLMeasurementContext : IGraphicsContext
     public void DrawImage(IImage image, Point location) { }
     public void DrawImage(IImage image, Rect destRect) { }
     public void DrawImage(IImage image, Rect destRect, Rect sourceRect) { }
-}
+} 
