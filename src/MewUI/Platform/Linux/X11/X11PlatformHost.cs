@@ -66,13 +66,15 @@ public sealed class X11PlatformHost : IPlatformHost
         _running = true;
 
         EnsureDisplay();
-        mainWindow.Show();
 
-        var dispatcher = CreateDispatcher(mainWindow.Handle);
+        var previousContext = SynchronizationContext.Current;
+        var dispatcher = CreateDispatcher(0);
         _dispatcher = dispatcher as LinuxUiDispatcher;
         app.Dispatcher = dispatcher;
         SynchronizationContext.SetSynchronizationContext(dispatcher as SynchronizationContext);
-        mainWindow.RaiseLoaded();
+
+        // Show after dispatcher is ready so timers/postbacks work immediately (WPF-style dispatcher lifetime).
+        mainWindow.Show();
 
         // Very simple single-display loop (from the main window).
         if (!_windows.TryGetValue(mainWindow.Handle, out var mainBackend))
@@ -103,7 +105,7 @@ public sealed class X11PlatformHost : IPlatformHost
 
                 PollDpiChanges();
 
-                dispatcher.ProcessWorkItems();
+                _dispatcher?.ProcessWorkItems();
 
                 // Coalesced rendering for all windows.
                 foreach (var backend in _windows.Values.ToArray())
@@ -131,6 +133,8 @@ public sealed class X11PlatformHost : IPlatformHost
             _display = 0;
         }
         _dispatcher = null;
+        app.Dispatcher = null;
+        SynchronizationContext.SetSynchronizationContext(previousContext);
     }
 
     private static nint GetEventWindow(in XEvent ev)

@@ -22,6 +22,8 @@ public sealed class Win32PlatformHost : IPlatformHost
     private nint _classNamePtr;
     private nint _moduleHandle;
     private SynchronizationContext? _previousSynchronizationContext;
+    private nint _dispatcherHwnd;
+    private Win32UiDispatcher? _dispatcher;
 
     public IMessageBoxService MessageBox => _messageBox;
 
@@ -64,13 +66,11 @@ public sealed class Win32PlatformHost : IPlatformHost
 
             _running = true;
 
-            mainWindow.Show();
-
             _previousSynchronizationContext = SynchronizationContext.Current;
-            var dispatcher = CreateDispatcher(mainWindow.Handle);
-            app.Dispatcher = dispatcher;
-            SynchronizationContext.SetSynchronizationContext(dispatcher as SynchronizationContext);
-            mainWindow.RaiseLoaded();
+            EnsureDispatcher(app);
+
+            // Show after dispatcher is ready so timers/postbacks work immediately (WPF-style dispatcher lifetime).
+            mainWindow.Show();
 
             MSG msg;
             while (_running && User32.GetMessage(out msg, 0, 0, 0) > 0)
@@ -164,6 +164,23 @@ public sealed class Win32PlatformHost : IPlatformHost
 
     private nint WndProc(nint hWnd, uint msg, nint wParam, nint lParam)
     {
+        if (hWnd == _dispatcherHwnd)
+        {
+            switch (msg)
+            {
+                case Win32UiDispatcher.WM_INVOKE:
+                    _dispatcher?.ProcessWorkItems();
+                    return 0;
+
+                case WindowMessages.WM_TIMER:
+                    if (_dispatcher?.ProcessTimer((nuint)wParam) == true)
+                    {
+                        return 0;
+                    }
+                    return 0;
+            }
+        }
+
         if (_windows.TryGetValue(hWnd, out var backend))
         {
             try
@@ -187,6 +204,40 @@ public sealed class Win32PlatformHost : IPlatformHost
         return User32.DefWindowProc(hWnd, msg, wParam, lParam);
     }
 
+    private void EnsureDispatcher(Application app)
+    {
+        if (_dispatcher != null && _dispatcherHwnd != 0)
+        {
+            app.Dispatcher = _dispatcher;
+            SynchronizationContext.SetSynchronizationContext(_dispatcher);
+            return;
+        }
+
+        const nint HWND_MESSAGE = -3;
+        _dispatcherHwnd = User32.CreateWindowEx(
+            0,
+            WindowClassName,
+            "AprillzMewUI_Dispatcher",
+            dwStyle: 0,
+            x: 0,
+            y: 0,
+            nWidth: 0,
+            nHeight: 0,
+            hWndParent: HWND_MESSAGE,
+            hMenu: 0,
+            hInstance: _moduleHandle,
+            lpParam: 0);
+
+        if (_dispatcherHwnd == 0)
+        {
+            throw new InvalidOperationException($"Failed to create dispatcher window. Error: {Marshal.GetLastWin32Error()}");
+        }
+
+        _dispatcher = new Win32UiDispatcher(_dispatcherHwnd);
+        app.Dispatcher = _dispatcher;
+        SynchronizationContext.SetSynchronizationContext(_dispatcher);
+    }
+
     private void Shutdown(Application app)
     {
         SynchronizationContext.SetSynchronizationContext(_previousSynchronizationContext);
@@ -197,6 +248,13 @@ public sealed class Win32PlatformHost : IPlatformHost
             backend.Window.Close();
         }
         _windows.Clear();
+
+        _dispatcher = null;
+        if (_dispatcherHwnd != 0 && User32.IsWindow(_dispatcherHwnd))
+        {
+            User32.DestroyWindow(_dispatcherHwnd);
+        }
+        _dispatcherHwnd = 0;
 
         if (_classAtom != 0)
         {

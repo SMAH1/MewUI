@@ -22,6 +22,7 @@ public sealed class Application
     private static IGraphicsFactory? _defaultGraphicsFactoryOverride;
     private static IPlatformHost _defaultPlatformHost = CreateDefaultPlatformHost();
     private static Exception? _pendingFatalException;
+   private IUiDispatcher? _dispatcher;
    
     /// <summary>
     /// Raised when an exception escapes from the platform message loop or window procedure.
@@ -41,7 +42,22 @@ public sealed class Application
 
     public IPlatformHost PlatformHost { get; }
 
-    public IUiDispatcher? Dispatcher { get; internal set; }
+    internal static event Action<IUiDispatcher?>? DispatcherChanged;
+
+    public IUiDispatcher? Dispatcher
+    {
+        get => _dispatcher;
+        internal set
+        {
+            if (_dispatcher == value)
+            {
+                return;
+            }
+
+            _dispatcher = value;
+            DispatcherChanged?.Invoke(value);
+        }
+    }
 
     /// <summary>
     /// Gets or sets the default graphics backend used by windows/controls.
@@ -109,7 +125,7 @@ public sealed class Application
     public static void Run(Window mainWindow)
     {
         if (_current != null)
-        {
+        {   
             throw new InvalidOperationException("Application is already running.");
         }
 

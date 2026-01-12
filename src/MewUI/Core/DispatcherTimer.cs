@@ -11,6 +11,7 @@ public sealed class DispatcherTimer : IDisposable
     private IDisposable? _scheduled;
     private TimeSpan _interval = TimeSpan.FromMilliseconds(1000);
     private bool _isEnabled;
+    private bool _subscribedToDispatcherChanged;
 
     public DispatcherTimer() { }
 
@@ -61,7 +62,22 @@ public sealed class DispatcherTimer : IDisposable
 
     public void Start()
     {
-        IUiDispatcher dispatcher = GetDispatcherOrThrow();
+        var dispatcher = TryGetDispatcher();
+        if (dispatcher == null)
+        {
+            lock (_gate)
+            {
+                if (_isEnabled)
+                {
+                    return;
+                }
+
+                _isEnabled = true;
+                SubscribeToDispatcherChanged();
+            }
+
+            return;
+        }
 
         dispatcher.Send(() =>
         {
@@ -73,6 +89,7 @@ public sealed class DispatcherTimer : IDisposable
                 }
 
                 _isEnabled = true;
+                UnsubscribeFromDispatcherChanged_NoLock();
                 _scheduled?.Dispose();
                 _scheduled = dispatcher.Schedule(_interval, OnTick);
             }
@@ -81,20 +98,16 @@ public sealed class DispatcherTimer : IDisposable
 
     public void Stop()
     {
-        if (!Application.IsRunning)
+        var dispatcher = TryGetDispatcher();
+        if (dispatcher == null)
         {
             lock (_gate)
             {
                 _isEnabled = false;
+                UnsubscribeFromDispatcherChanged_NoLock();
                 _scheduled?.Dispose();
                 _scheduled = null;
             }
-            return;
-        }
-
-        var dispatcher = Application.Current.Dispatcher;
-        if (dispatcher == null)
-        {
             return;
         }
 
@@ -108,6 +121,7 @@ public sealed class DispatcherTimer : IDisposable
                 }
 
                 _isEnabled = false;
+                UnsubscribeFromDispatcherChanged_NoLock();
                 _scheduled?.Dispose();
                 _scheduled = null;
             }
@@ -116,7 +130,12 @@ public sealed class DispatcherTimer : IDisposable
 
     private void OnTick()
     {
-        IUiDispatcher dispatcher = GetDispatcherOrThrow();
+        var dispatcher = TryGetDispatcher();
+        if (dispatcher == null)
+        {
+            Stop();
+            return;
+        }
 
         lock (_gate)
         {
@@ -145,12 +164,7 @@ public sealed class DispatcherTimer : IDisposable
 
     private void Reschedule()
     {
-        if (!Application.IsRunning)
-        {
-            return;
-        }
-
-        var dispatcher = Application.Current.Dispatcher;
+        var dispatcher = TryGetDispatcher();
         if (dispatcher == null)
         {
             return;
@@ -171,20 +185,58 @@ public sealed class DispatcherTimer : IDisposable
         });
     }
 
-    private static IUiDispatcher GetDispatcherOrThrow()
+    private void SubscribeToDispatcherChanged()
+    {
+        if (_subscribedToDispatcherChanged)
+        {
+            return;
+        }
+
+        _subscribedToDispatcherChanged = true;
+        Application.DispatcherChanged += OnDispatcherChanged;
+    }
+
+    private void UnsubscribeFromDispatcherChanged_NoLock()
+    {
+        if (!_subscribedToDispatcherChanged)
+        {
+            return;
+        }
+
+        _subscribedToDispatcherChanged = false;
+        Application.DispatcherChanged -= OnDispatcherChanged;
+    }
+
+    private void OnDispatcherChanged(IUiDispatcher? dispatcher)
+    {
+        if (dispatcher == null)
+        {
+            return;
+        }
+
+        dispatcher.Send(() =>
+        {
+            lock (_gate)
+            {
+                if (!_isEnabled || _scheduled != null)
+                {
+                    return;
+                }
+
+                UnsubscribeFromDispatcherChanged_NoLock();
+                _scheduled = dispatcher.Schedule(_interval, OnTick);
+            }
+        });
+    }
+
+    private static IUiDispatcher? TryGetDispatcher()
     {
         if (!Application.IsRunning)
         {
-            throw new InvalidOperationException("DispatcherTimer requires an active Application.");
+            return null;
         }
 
-        var dispatcher = Application.Current.Dispatcher;
-        if (dispatcher == null)
-        {
-            throw new InvalidOperationException("DispatcherTimer requires Application.Dispatcher.");
-        }
-
-        return dispatcher;
+        return Application.Current.Dispatcher;
     }
 
     public void Dispose()
