@@ -17,10 +17,13 @@ public class Window : ContentControl
     private IWindowBackend? _backend;
     private Size _clientSizeDip = Size.Empty;
     private Size _lastLayoutClientSizeDip = Size.Empty;
+    private Thickness _lastLayoutPadding = Thickness.Zero;
     private readonly List<PopupEntry> _popups = new();
     private readonly RadioGroupManager _radioGroups = new();
     private bool _loadedRaised;
     private bool _firstFrameRenderedRaised;
+    private bool _firstFrameRenderedPending;
+    private bool _subscribedToDispatcherChanged;
 
     private sealed class PopupEntry
     {
@@ -214,10 +217,7 @@ public class Window : ContentControl
         get => _theme;
         set
         {
-            if (value == null)
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
+            ArgumentNullException.ThrowIfNull(value);
 
             if (_theme == value)
             {
@@ -252,10 +252,17 @@ public class Window : ContentControl
         _backend!.Show();
 
         // Raise Loaded once, and only after the application's dispatcher is ready.
-        // The platform host will raise Loaded for the very first window after it sets the dispatcher.
-        if (!_loadedRaised && Application.IsRunning && Application.Current.Dispatcher != null)
+        // Do not rely on PlatformHost.Run ordering: a first render can happen during Show on some platforms.
+        if (!_loadedRaised && Application.IsRunning)
         {
-            RaiseLoaded();
+            if (Application.Current.Dispatcher != null)
+            {
+                RaiseLoaded();
+            }
+            else
+            {
+                SubscribeToDispatcherChanged();
+            }
         }
     }
 
@@ -287,19 +294,21 @@ public class Window : ContentControl
         }
 
         var clientSize = _clientSizeDip.IsEmpty ? new Size(Width, Height) : _clientSizeDip;
+        var padding = Padding;
 
         // Layout can be expensive (e.g., large item collections). If nothing is dirty and the
         // client size hasn't changed, avoid re-running Measure/Arrange on every paint.
-        if (clientSize == _lastLayoutClientSizeDip && !IsLayoutDirty(Content))
+        if (clientSize == _lastLayoutClientSizeDip && padding == _lastLayoutPadding && !IsLayoutDirty(Content))
         {
             return;
         }
 
         const int maxPasses = 8;
+        var contentSize = clientSize.Deflate(padding);
         for (int pass = 0; pass < maxPasses; pass++)
         {
-            Content.Measure(new Size(clientSize.Width, clientSize.Height));
-            Content.Arrange(new Rect(0, 0, clientSize.Width, clientSize.Height));
+            Content.Measure(contentSize);
+            Content.Arrange(new Rect(padding.Left, padding.Top, contentSize.Width, contentSize.Height));
 
             if (!IsLayoutDirty(Content))
             {
@@ -308,6 +317,7 @@ public class Window : ContentControl
         }
 
         _lastLayoutClientSizeDip = clientSize;
+        _lastLayoutPadding = padding;
     }
 
     private static bool IsLayoutDirty(Element root)
@@ -377,14 +387,32 @@ public class Window : ContentControl
 
         PerformLayout();
         Loaded?.Invoke();
+
+        if (_firstFrameRenderedPending && !_firstFrameRenderedRaised)
+        {
+            _firstFrameRenderedPending = false;
+            _firstFrameRenderedRaised = true;
+            FirstFrameRendered?.Invoke();
+        }
     }
 
-    internal void RaiseClosed() => Closed?.Invoke();
+    internal void RaiseClosed()
+    {
+        UnsubscribeFromDispatcherChanged();
+        Closed?.Invoke();
+    }
 
     internal void RaiseSizeChanged(double widthDip, double heightDip) => SizeChanged?.Invoke(new Size(widthDip, heightDip));
 
     internal void RenderFrame(nint hdc)
     {
+        // Some platforms can render before Loaded is raised due to Run/Show/Dispatcher ordering.
+        // Ensure Loaded is raised as soon as the dispatcher is available, and always before FirstFrameRendered.
+        if (!_loadedRaised && Application.IsRunning && Application.Current.Dispatcher != null)
+        {
+            RaiseLoaded();
+        }
+
         using var context = GraphicsFactory.CreateContext(Handle, hdc, DpiScale);
         context.Clear(Background.A > 0 ? Background : Theme.WindowBackground);
 
@@ -410,9 +438,53 @@ public class Window : ContentControl
 
         if (!_firstFrameRenderedRaised)
         {
-            _firstFrameRenderedRaised = true;
-            FirstFrameRendered?.Invoke();
+            if (_loadedRaised)
+            {
+                _firstFrameRenderedRaised = true;
+                FirstFrameRendered?.Invoke();
+            }
+            else
+            {
+                _firstFrameRenderedPending = true;
+            }
         }
+    }
+
+    private void SubscribeToDispatcherChanged()
+    {
+        if (_subscribedToDispatcherChanged)
+        {
+            return;
+        }
+
+        _subscribedToDispatcherChanged = true;
+        Application.DispatcherChanged += OnDispatcherChanged;
+    }
+
+    private void UnsubscribeFromDispatcherChanged()
+    {
+        if (!_subscribedToDispatcherChanged)
+        {
+            return;
+        }
+
+        _subscribedToDispatcherChanged = false;
+        Application.DispatcherChanged -= OnDispatcherChanged;
+    }
+
+    private void OnDispatcherChanged(IUiDispatcher? dispatcher)
+    {
+        if (dispatcher == null)
+        {
+            return;
+        }
+
+        // Ensure Loaded is raised on the UI thread.
+        dispatcher.Send(() =>
+        {
+            UnsubscribeFromDispatcherChanged();
+            RaiseLoaded();
+        });
     }
 
     internal void DisposeVisualTree()
@@ -543,15 +615,8 @@ public class Window : ContentControl
 
     internal void ShowPopup(UIElement owner, UIElement popup, Rect bounds)
     {
-        if (owner == null)
-        {
-            throw new ArgumentNullException(nameof(owner));
-        }
-
-        if (popup == null)
-        {
-            throw new ArgumentNullException(nameof(popup));
-        }
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(popup);
 
         // Replace if already present.
         for (int i = 0; i < _popups.Count; i++)
