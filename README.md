@@ -1,4 +1,4 @@
-[![한국어](https://img.shields.io/badge/README.md-한국어-green.svg)](README.ko.md)
+[![한국어](https://img.shields.io/badge/README.md-한국어-green.svg)](ko)
 
 ![Aprillz.MewUI](https://raw.githubusercontent.com/aprillz/MewUI/main/assets/logo/logo_h-1280.png)
 
