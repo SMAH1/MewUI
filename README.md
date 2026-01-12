@@ -1,4 +1,4 @@
-[![한국어](https://img.shields.io/badge/README.md-한국어-green.svg)](README.ko.md)
+[![한국어](https://img.shields.io/badge/README.md-한국어-green.svg)](ko)
 
 ![Aprillz.MewUI](https://raw.githubusercontent.com/aprillz/MewUI/main/assets/logo/logo_h-1280.png)
 
@@ -13,14 +13,16 @@
 
 ---
 
-**😺 MewUI** is a **cross-platform** and minimal, code-first .NET GUI library aimed at **NativeAOT + Trim**.
+**😺 MewUI** is a cross-platform and lightweight, code-first .NET GUI library aimed at NativeAOT.
 
-- ## 🧪 Experimental Prototype
-  > ⚠️ This project is a **proof-of-concept prototype** for validating ideas and exploring design directions.  
-  > ⚠️ As it evolves toward **v1.0**, **APIs, internal architecture, and runtime behavior may change significantly**.  
-  > ⚠️ Backward compatibility is **not guaranteed** at this stage.
+### 🧪 Experimental Prototype
+  > [!IMPORTANT]  
+  > This project is a **proof-of-concept prototype** for validating ideas and exploring design directions.  
+  > As it evolves toward **v1.0**, **APIs, internal architecture, and runtime behavior may change significantly**.  
+  > Backward compatibility is **not guaranteed** at this stage.
 
-- ## 🤖 AI-Assisted Development 
+### 🤖 AI-Assisted Development
+  > [!NOTE]
   > This project was developed using an **AI prompt–driven workflow**.  
   > Design and implementation were performed through **iterative prompting without direct manual code edits**,  
   > with each step reviewed and refined by the developer.
@@ -30,7 +32,8 @@
 ## 🚀 Try It Out
 
 You can run it immediately by entering the following command in the Windows command line or a Linux terminal. (.NET 10 SDK required)
-> ⚠️ This command downloads and executes code directly from GitHub.
+> [!WARNING]
+> This command downloads and executes code directly from GitHub.
 ```bahs
 curl -sL https://raw.githubusercontent.com/aprillz/MewUI/refs/heads/main/samples/FBASample/fba_sample.cs -o - | dotnet run -
 ```
