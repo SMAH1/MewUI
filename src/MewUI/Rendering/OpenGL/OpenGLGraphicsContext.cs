@@ -636,10 +636,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
 
     public void DrawImage(IImage image, Point location)
     {
-        if (image == null)
-        {
-            throw new ArgumentNullException(nameof(image));
-        }
+        ArgumentNullException.ThrowIfNull(image);
 
         var dest = new Rect(location.X, location.Y, image.PixelWidth, image.PixelHeight);
         DrawImage(image, dest);
@@ -647,10 +644,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
 
     public void DrawImage(IImage image, Rect destRect)
     {
-        if (image == null)
-        {
-            throw new ArgumentNullException(nameof(image));
-        }
+        ArgumentNullException.ThrowIfNull(image);
 
         if (image is not OpenGLImage glImage)
         {
@@ -681,10 +675,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
 
     public void DrawImage(IImage image, Rect destRect, Rect sourceRect)
     {
-        if (image == null)
-        {
-            throw new ArgumentNullException(nameof(image));
-        }
+        ArgumentNullException.ThrowIfNull(image);
 
         if (image is not OpenGLImage glImage)
         {

@@ -22,10 +22,7 @@ internal unsafe struct LOGFONT
 
     public void SetFaceName(string name)
     {
-        if (name == null)
-        {
-            throw new ArgumentNullException(nameof(name));
-        }
+        ArgumentNullException.ThrowIfNull(name);
 
         int len = Math.Min(name.Length, 31);
         for (int i = 0; i < len; i++)

@@ -13,7 +13,8 @@ public sealed class ImageSource
 
     private ImageSource(byte[] data)
     {
-        Data = data ?? throw new ArgumentNullException(nameof(data));
+        ArgumentNullException.ThrowIfNull(data);
+        Data = data;
         Format = ImageDecoders.DetectFormat(Data);
     }
 
@@ -27,10 +28,7 @@ public sealed class ImageSource
     /// </summary>
     public static ImageSource FromResource(Assembly assembly, string resourceName)
     {
-        if (assembly == null)
-        {
-            throw new ArgumentNullException(nameof(assembly));
-        }
+        ArgumentNullException.ThrowIfNull(assembly);
 
         if (string.IsNullOrWhiteSpace(resourceName))
         {

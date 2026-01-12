@@ -18,7 +18,7 @@ public sealed class IconSource
 
         if (source == null)
         {
-            throw new ArgumentNullException(nameof(source));
+            ArgumentNullException.ThrowIfNull(source);
         }
 
         _entries.Add(new Entry(sizePx, source));
@@ -54,4 +54,3 @@ public sealed class IconSource
         return best.Source;
     }
 }
-

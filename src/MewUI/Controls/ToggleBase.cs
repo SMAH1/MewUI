@@ -72,15 +72,8 @@ public abstract class ToggleBase : Control
         Action<Action>? subscribe = null,
         Action<Action>? unsubscribe = null)
     {
-        if (get == null)
-        {
-            throw new ArgumentNullException(nameof(get));
-        }
-
-        if (set == null)
-        {
-            throw new ArgumentNullException(nameof(set));
-        }
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(set);
 
         _checkedBinding?.Dispose();
         _checkedBinding = new ValueBinding<bool>(
@@ -128,4 +121,3 @@ public abstract class ToggleBase : Control
         base.OnDispose();
     }
 }
-

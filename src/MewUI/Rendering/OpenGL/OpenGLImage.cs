@@ -17,7 +17,8 @@ internal sealed class OpenGLImage : IImage
     {
         PixelWidth = widthPx;
         PixelHeight = heightPx;
-        _bgra = bgra ?? throw new ArgumentNullException(nameof(bgra));
+        ArgumentNullException.ThrowIfNull(bgra);
+        _bgra = bgra;
         if (_bgra.Length != widthPx * heightPx * 4)
         {
             throw new ArgumentException("Invalid BGRA buffer length.", nameof(bgra));

@@ -15,6 +15,8 @@ public sealed class Slider : RangeBase
 
     protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
 
+    public override bool Focusable => true;
+
     public Slider()
     {
         Maximum = 100;
@@ -95,20 +97,13 @@ public sealed class Slider : RangeBase
         var thumbRect = new Rect(thumbX, thumbY, thumbSize, thumbSize);
 
         var thumbFill = IsEnabled ? theme.ControlBackground : theme.TextBoxDisabledBackground;
+      
         context.FillEllipse(thumbRect, thumbFill);
 
-        var thumbBorder = BorderBrush;
-        if (IsEnabled)
-        {
-            if (IsFocused || _isDragging)
-            {
-                thumbBorder = theme.Accent;
-            }
-            else if (IsMouseOver)
-            {
-                thumbBorder = BorderBrush.Lerp(theme.Accent, 0.6);
-            }
-        }
+        var state = GetVisualState(IsFocused,IsFocused);
+        Color thumbBorder = PickAccentBorder(theme, BorderBrush, state, hoverMix: 0.6);
+
+        
         context.DrawEllipse(thumbRect, thumbBorder, 1);
     }
 
@@ -171,21 +166,71 @@ public sealed class Slider : RangeBase
     {
         base.OnKeyDown(e);
 
-        if (!IsEnabled)
+        if (e.Handled || !IsEnabled)
         {
             return;
         }
 
-        if (e.Key == Key.Left)
+        double step = GetKeyboardSmallStep();
+        double largeStep = GetKeyboardLargeStep(step);
+
+        if (e.Key is Key.Left or Key.Down)
         {
-            SetValueInternal(Value - SmallChange, fromUser: true);
+            SetValueInternal(Value - step, fromUser: true);
             e.Handled = true;
         }
-        else if (e.Key == Key.Right)
+        else if (e.Key is Key.Right or Key.Up)
         {
-            SetValueInternal(Value + SmallChange, fromUser: true);
+            SetValueInternal(Value + step, fromUser: true);
             e.Handled = true;
         }
+        else if (e.Key == Key.PageDown)
+        {
+            SetValueInternal(Value - largeStep, fromUser: true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.PageUp)
+        {
+            SetValueInternal(Value + largeStep, fromUser: true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Home)
+        {
+            SetValueInternal(Minimum, fromUser: true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.End)
+        {
+            SetValueInternal(Maximum, fromUser: true);
+            e.Handled = true;
+        }
+    }
+
+    private double GetKeyboardSmallStep()
+    {
+        if (SmallChange > 0 && !double.IsNaN(SmallChange) && !double.IsInfinity(SmallChange))
+        {
+            return SmallChange;
+        }
+
+        double range = Math.Abs(Maximum - Minimum);
+        if (range > 0)
+        {
+            return range / 100.0;
+        }
+
+        return 1;
+    }
+
+    private double GetKeyboardLargeStep(double smallStep)
+    {
+        double range = Math.Abs(Maximum - Minimum);
+        if (range > 0)
+        {
+            return Math.Max(smallStep * 10, range / 10.0);
+        }
+
+        return smallStep * 10;
     }
 
     private void SetValueFromPosition(double x)

@@ -514,15 +514,8 @@ public class ListBox : Control
         Action<Action>? subscribe = null,
         Action<Action>? unsubscribe = null)
     {
-        if (get == null)
-        {
-            throw new ArgumentNullException(nameof(get));
-        }
-
-        if (set == null)
-        {
-            throw new ArgumentNullException(nameof(set));
-        }
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(set);
 
         _selectedIndexBinding?.Dispose();
         _selectedIndexBinding = new ValueBinding<int>(

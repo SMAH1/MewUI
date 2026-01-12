@@ -48,21 +48,21 @@ public sealed class Palette
         ButtonFace = buttonFace;
         ButtonDisabledBackground = buttonDisabledBackground;
 
-        Accent = accent;
-        AccentText = accentText ?? GetDefaultAccentText(accent);
+    Accent = accent;
+    AccentText = accentText ?? GetDefaultAccentText(accent);
 
-        var isDark = IsDarkBackground(windowBackground);
-        var hoverT = isDark ? 0.22 : 0.14;
-        var pressedT = isDark ? 0.32 : 0.24;
+    var isDark = IsDarkBackground(windowBackground);
+    var hoverT = isDark ? 0.22 : 0.14;
+    var pressedT = isDark ? 0.32 : 0.24;
 
-        SelectionBackground = ComputeSelectionBackground(controlBackground, accent);
-        SelectionText = GetDefaultAccentText(SelectionBackground);
+    SelectionBackground = ComputeSelectionBackground(controlBackground, accent);
+    SelectionText = GetDefaultAccentText(SelectionBackground);
 
-        ControlBorder = ComputeControlBorder(windowBackground, windowText, accent);
-        DisabledText = ComputeDisabledText(windowBackground, windowText);
-        PlaceholderText = DisabledText.WithAlpha(127);
-        TextBoxDisabledBackground = ComputeTextBoxDisabledBackground(windowBackground, controlBackground);
-        ButtonHoverBackground = buttonFace.Lerp(accent, hoverT);
+    ControlBorder = ComputeControlBorder(windowBackground, windowText, accent);
+    DisabledText = ComputeDisabledText(windowBackground, windowText);
+    PlaceholderText = DisabledText.WithAlpha(127);
+    TextBoxDisabledBackground = ComputeTextBoxDisabledBackground(windowBackground, controlBackground);
+    ButtonHoverBackground = buttonFace.Lerp(accent, hoverT);
         ButtonPressedBackground = buttonFace.Lerp(accent, pressedT);
         FocusRect = accent;
 

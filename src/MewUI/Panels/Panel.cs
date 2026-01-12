@@ -22,10 +22,7 @@ public abstract class Panel : Control
     /// </summary>
     public void Add(Element child)
     {
-        if (child == null)
-        {
-            throw new ArgumentNullException(nameof(child));
-        }
+        ArgumentNullException.ThrowIfNull(child);
 
         child.Parent = this;
         _children.Add(child);
@@ -88,10 +85,7 @@ public abstract class Panel : Control
     /// </summary>
     public void Insert(int index, Element child)
     {
-        if (child == null)
-        {
-            throw new ArgumentNullException(nameof(child));
-        }
+        ArgumentNullException.ThrowIfNull(child);
 
         child.Parent = this;
         _children.Insert(index, child);

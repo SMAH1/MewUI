@@ -16,11 +16,14 @@ public sealed class ValueBinding<T> : IDisposable
         Action<Action>? unsubscribe,
         Action onSourceChanged)
     {
-        _get = get ?? throw new ArgumentNullException(nameof(get));
+        ArgumentNullException.ThrowIfNull(get);
+        ArgumentNullException.ThrowIfNull(onSourceChanged);
+
+        _get = get;
         _set = set;
         _subscribe = subscribe;
         _unsubscribe = unsubscribe;
-        _onSourceChanged = onSourceChanged ?? throw new ArgumentNullException(nameof(onSourceChanged));
+        _onSourceChanged = onSourceChanged;
 
         _subscribe?.Invoke(_onSourceChanged);
     }
@@ -40,4 +43,3 @@ public sealed class ValueBinding<T> : IDisposable
         _disposed = true;
     }
 }
-

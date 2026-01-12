@@ -24,10 +24,7 @@ public sealed class DockPanel : Panel
 
     public static void SetDock(Element element, Dock dock)
     {
-        if (element == null)
-        {
-            throw new ArgumentNullException(nameof(element));
-        }
+        ArgumentNullException.ThrowIfNull(element);
 
         DockMap.GetOrCreateValue(element).Dock = dock;
         element.InvalidateArrange();
@@ -35,10 +32,7 @@ public sealed class DockPanel : Panel
 
     public static Dock GetDock(Element element)
     {
-        if (element == null)
-        {
-            throw new ArgumentNullException(nameof(element));
-        }
+        ArgumentNullException.ThrowIfNull(element);
 
         return DockMap.TryGetValue(element, out var data) ? data.Dock : Dock.Left;
     }

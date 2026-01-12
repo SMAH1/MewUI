@@ -19,10 +19,7 @@ public static class ImageDecoders
 
     public static void Register(IImageDecoder decoder)
     {
-        if (decoder == null)
-        {
-            throw new ArgumentNullException(nameof(decoder));
-        }
+        ArgumentNullException.ThrowIfNull(decoder);
 
         if (decoder.Format == ImageFormat.Unknown)
         {
@@ -69,10 +66,7 @@ public static class ImageDecoders
 
     public static bool TryDecode(byte[] encoded, out DecodedBitmap bitmap)
     {
-        if (encoded == null)
-        {
-            throw new ArgumentNullException(nameof(encoded));
-        }
+        ArgumentNullException.ThrowIfNull(encoded);
 
         var format = DetectFormat(encoded);
         if (format == ImageFormat.Unknown)
