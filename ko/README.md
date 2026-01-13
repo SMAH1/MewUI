@@ -168,12 +168,15 @@ var label  = new Label()
 ## 🧱 컨트롤 / 패널
 
 컨트롤:
-- `Label`, `Button`, `TextBox`, `MultiLineTextBox`
-- `CheckBox`, `RadioButton`
-- `ListBox`, `ComboBox`
+- `Button`  
+- `Label`, `Image`
+- `TextBox`, `MultiLineTextBox`
+- `CheckBox`, `RadioButton`, 
+- `ComboBox`, `ListBox`
 - `Slider`, `ProgressBar`
-- `Image`, `DispatcherTimer`
-- `Window`
+- `TabControl`, `GroupBox`
+- `Window`  
+- `DispatcherTimer`
 
 패널:
 - `Grid` (row/column: `Auto`, `*`, pixel)
@@ -223,15 +226,14 @@ Theme.Current = Theme.Current.WithAccent(Color.FromRgb(214, 176, 82));
 ## 🧭 로드맵 (TODO)
 
 **컨트롤**
-- [ ] `GroupBox`
-- [ ] `TabControl`
+- [ ] `ToggleSwitch`
+- [ ] `GridView`
 
-**렌더링**
-- [ ] 폰트 셰이핑(HarfBuzz)
-- [ ] 글리프 아틀라스/캐시 개선
+**기능**
+- [ ] 간단한 템플릿 지원 (델리게이트 기반)
 
 **플랫폼**
-- [ ] Wayland
+- [ ] Linux/Wayland
 - [ ] macOS
 
 **툴링**

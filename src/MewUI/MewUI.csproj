@@ -10,9 +10,9 @@
     <!-- Assembly Info -->
     <RootNamespace>Aprillz.MewUI</RootNamespace>
     <AssemblyName>Aprillz.MewUI</AssemblyName>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <Authors>Aprillz</Authors>
-    <Description>Aprillz.MewUI - minimal .NET GUI library for Native AOT compilation</Description>
+    <Description>A cross-platform and lightweight, code-first .NET GUI library aimed at NativeAOT</Description>
 
     <!-- NuGet -->
     <PackageId>Aprillz.MewUI</PackageId>

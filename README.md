@@ -165,12 +165,15 @@ var label  = new Label().BindText(percent, v => $"Percent ({v:P0})");
 ## 🧱 Controls / Panels
 
 Controls:
-- `Label`, `Button`, `TextBox`, `MultiLineTextBox`
-- `CheckBox`, `RadioButton`
-- `ListBox`, `ComboBox`
+- `Button`  
+- `Label`, `Image`
+- `TextBox`, `MultiLineTextBox`
+- `CheckBox`, `RadioButton`, 
+- `ComboBox`, `ListBox`
 - `Slider`, `ProgressBar`
-- `Image`, `DispatcherTimer`
-- `Window`
+- `TabControl`, `GroupBox`
+- `Window`  
+- `DispatcherTimer`
 
 Panels:
 - `Grid` (rows/columns with `Auto`, `*`, pixel)
@@ -220,15 +223,14 @@ Currently implemented:
 ## 🧭 Roadmap (TODO)
 
 **Controls**
-- [ ] `GroupBox`
-- [ ] `TabControl`
+- [ ] `ToggleSwitch`
+- [ ] `GridView`
 
-**Rendering**
-- [ ] Better text shaping (HarfBuzz)
-- [ ] Glyph atlas + caching improvements
+**Features**
+- [ ] Simple template support (Delegate-based)
 
 **Platforms**
-- [ ] Wayland
+- [ ] Linux/Wayland
 - [ ] macOS
 
 **Tooling**
