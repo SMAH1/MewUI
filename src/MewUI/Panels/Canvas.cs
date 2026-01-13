@@ -1,4 +1,7 @@
 using Aprillz.MewUI.Elements;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
 using Aprillz.MewUI.Primitives;
 
 namespace Aprillz.MewUI.Panels;
@@ -8,35 +11,42 @@ namespace Aprillz.MewUI.Panels;
 /// </summary>
 public class Canvas : Panel
 {
-    // Attached properties storage (AOT-compatible)
-    private static readonly Dictionary<Element, double> _leftProperty = new();
-    private static readonly Dictionary<Element, double> _topProperty = new();
-    private static readonly Dictionary<Element, double> _rightProperty = new();
-    private static readonly Dictionary<Element, double> _bottomProperty = new();
+    private static readonly ConditionalWeakTable<Element, CanvasAttachedProperties> _attachedProperties = new();
+
+    private sealed class CanvasAttachedProperties
+    {
+        public double Left = double.NaN;
+        public double Top = double.NaN;
+        public double Right = double.NaN;
+        public double Bottom = double.NaN;
+    }
 
     #region Attached Properties
 
-    public static void SetLeft(Element element, double value) => _leftProperty[element] = value;
-    public static double GetLeft(Element element) => _leftProperty.GetValueOrDefault(element, double.NaN);
+    public static void SetLeft(Element element, double value) => GetOrCreate(element).Left = value;
+    public static double GetLeft(Element element) => TryGet(element, out var props) ? props.Left : double.NaN;
 
-    public static void SetTop(Element element, double value) => _topProperty[element] = value;
-    public static double GetTop(Element element) => _topProperty.GetValueOrDefault(element, double.NaN);
+    public static void SetTop(Element element, double value) => GetOrCreate(element).Top = value;
+    public static double GetTop(Element element) => TryGet(element, out var props) ? props.Top : double.NaN;
 
-    public static void SetRight(Element element, double value) => _rightProperty[element] = value;
-    public static double GetRight(Element element) => _rightProperty.GetValueOrDefault(element, double.NaN);
+    public static void SetRight(Element element, double value) => GetOrCreate(element).Right = value;
+    public static double GetRight(Element element) => TryGet(element, out var props) ? props.Right : double.NaN;
 
-    public static void SetBottom(Element element, double value) => _bottomProperty[element] = value;
-    public static double GetBottom(Element element) => _bottomProperty.GetValueOrDefault(element, double.NaN);
+    public static void SetBottom(Element element, double value) => GetOrCreate(element).Bottom = value;
+    public static double GetBottom(Element element) => TryGet(element, out var props) ? props.Bottom : double.NaN;
+
+    private static CanvasAttachedProperties GetOrCreate(Element element) =>
+        _attachedProperties.GetOrCreateValue(element);
+
+    private static bool TryGet(Element element, [NotNullWhen(true)] out CanvasAttachedProperties? properties)
+        => _attachedProperties.TryGetValue(element, out properties!);
 
     #endregion
 
     protected override void OnChildRemoved(Element child)
     {
         // Clean up attached properties
-        _leftProperty.Remove(child);
-        _topProperty.Remove(child);
-        _rightProperty.Remove(child);
-        _bottomProperty.Remove(child);
+        _attachedProperties.Remove(child);
     }
 
     protected override Size MeasureContent(Size availableSize)

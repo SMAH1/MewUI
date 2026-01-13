@@ -1,4 +1,7 @@
 using Aprillz.MewUI.Elements;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
 using Aprillz.MewUI.Primitives;
 
 namespace Aprillz.MewUI.Panels;
@@ -74,11 +77,17 @@ public class Grid : Panel
     private readonly List<RowDefinition> _rowDefinitions = new();
     private readonly List<ColumnDefinition> _columnDefinitions = new();
 
-    // Attached properties storage (AOT-compatible)
-    private static readonly Dictionary<Element, int> _rowProperty = new();
-    private static readonly Dictionary<Element, int> _columnProperty = new();
-    private static readonly Dictionary<Element, int> _rowSpanProperty = new();
-    private static readonly Dictionary<Element, int> _columnSpanProperty = new();
+    private static readonly ConditionalWeakTable<Element, GridAttachedProperties> _attachedProperties = new();
+
+    private sealed class GridAttachedProperties
+    {
+        public int Row;
+        public bool HasRow;
+        public int Column;
+        public bool HasColumn;
+        public int RowSpan = 1;
+        public int ColumnSpan = 1;
+    }
 
     public IList<RowDefinition> RowDefinitions => _rowDefinitions;
     public IList<ColumnDefinition> ColumnDefinitions => _columnDefinitions;
@@ -103,28 +112,42 @@ public class Grid : Panel
 
     #region Attached Properties
 
-    public static void SetRow(Element element, int row) => _rowProperty[element] = row;
-    public static int GetRow(Element element) => _rowProperty.GetValueOrDefault(element, 0);
-    internal static bool HasRow(Element element) => _rowProperty.ContainsKey(element);
+    public static void SetRow(Element element, int row)
+    {
+        var props = GetOrCreate(element);
+        props.Row = row;
+        props.HasRow = true;
+    }
 
-    public static void SetColumn(Element element, int column) => _columnProperty[element] = column;
-    public static int GetColumn(Element element) => _columnProperty.GetValueOrDefault(element, 0);
-    internal static bool HasColumn(Element element) => _columnProperty.ContainsKey(element);
+    public static int GetRow(Element element) => TryGet(element, out var props) ? props.Row : 0;
+    internal static bool HasRow(Element element) => TryGet(element, out var props) && props.HasRow;
 
-    public static void SetRowSpan(Element element, int span) => _rowSpanProperty[element] = span;
-    public static int GetRowSpan(Element element) => _rowSpanProperty.GetValueOrDefault(element, 1);
+    public static void SetColumn(Element element, int column)
+    {
+        var props = GetOrCreate(element);
+        props.Column = column;
+        props.HasColumn = true;
+    }
 
-    public static void SetColumnSpan(Element element, int span) => _columnSpanProperty[element] = span;
-    public static int GetColumnSpan(Element element) => _columnSpanProperty.GetValueOrDefault(element, 1);
+    public static int GetColumn(Element element) => TryGet(element, out var props) ? props.Column : 0;
+    internal static bool HasColumn(Element element) => TryGet(element, out var props) && props.HasColumn;
+
+    public static void SetRowSpan(Element element, int span) => GetOrCreate(element).RowSpan = span;
+    public static int GetRowSpan(Element element) => TryGet(element, out var props) ? props.RowSpan : 1;
+
+    public static void SetColumnSpan(Element element, int span) => GetOrCreate(element).ColumnSpan = span;
+    public static int GetColumnSpan(Element element) => TryGet(element, out var props) ? props.ColumnSpan : 1;
+
+    private static GridAttachedProperties GetOrCreate(Element element) => _attachedProperties.GetOrCreateValue(element);
+
+    private static bool TryGet(Element element, [NotNullWhen(true)] out GridAttachedProperties? properties)
+        => _attachedProperties.TryGetValue(element, out properties!);
 
     #endregion
 
     protected override void OnChildRemoved(Element child)
     {
-        _rowProperty.Remove(child);
-        _columnProperty.Remove(child);
-        _rowSpanProperty.Remove(child);
-        _columnSpanProperty.Remove(child);
+        _attachedProperties.Remove(child);
     }
 
     protected override Size MeasureContent(Size availableSize)

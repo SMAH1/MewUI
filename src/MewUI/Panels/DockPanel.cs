@@ -43,6 +43,12 @@ public sealed class DockPanel : Panel
         set { field = value; InvalidateMeasure(); }
     } = true;
 
+    public double Spacing
+    {
+        get;
+        set { field = value; InvalidateMeasure(); }
+    }
+
     protected override Size MeasureContent(Size availableSize)
     {
         if (Count == 0)
@@ -51,13 +57,28 @@ public sealed class DockPanel : Panel
         }
 
         var inner = availableSize.Deflate(Padding);
+        double spacing = Math.Max(0, Spacing);
 
         double usedW = 0;
         double usedH = 0;
         double desiredW = 0;
         double desiredH = 0;
 
-        int last = Count - 1;
+        int lastVisible = -1;
+        for (int i = Count - 1; i >= 0; i--)
+        {
+            if (this[i] is UIElement ui && ui.IsVisible)
+            {
+                lastVisible = i;
+                break;
+            }
+        }
+
+        if (lastVisible < 0)
+        {
+            return Size.Empty;
+        }
+
         for (int i = 0; i < Count; i++)
         {
             var child = this[i];
@@ -66,7 +87,7 @@ public sealed class DockPanel : Panel
                 continue;
             }
 
-            bool isLastFill = LastChildFill && i == last;
+            bool isLastFill = LastChildFill && i == lastVisible;
             var remaining = new Size(Math.Max(0, inner.Width - usedW), Math.Max(0, inner.Height - usedH));
             var dock = GetDock(child);
 
@@ -101,17 +122,18 @@ public sealed class DockPanel : Panel
                 continue;
             }
 
+            bool addSpacing = spacing > 0 && i != lastVisible;
             switch (dock)
             {
                 case Dock.Left:
                 case Dock.Right:
-                    usedW += desired.Width;
+                    usedW += desired.Width + (addSpacing ? spacing : 0);
                     desiredW = Math.Max(desiredW, usedW);
                     desiredH = Math.Max(desiredH, usedH + desired.Height);
                     break;
                 case Dock.Top:
                 case Dock.Bottom:
-                    usedH += desired.Height;
+                    usedH += desired.Height + (addSpacing ? spacing : 0);
                     desiredW = Math.Max(desiredW, usedW + desired.Width);
                     desiredH = Math.Max(desiredH, usedH);
                     break;
@@ -129,13 +151,28 @@ public sealed class DockPanel : Panel
         }
 
         var inner = bounds.Deflate(Padding);
+        double spacing = Math.Max(0, Spacing);
 
         double left = inner.X;
         double top = inner.Y;
         double right = inner.Right;
         double bottom = inner.Bottom;
 
-        int last = Count - 1;
+        int lastVisible = -1;
+        for (int i = Count - 1; i >= 0; i--)
+        {
+            if (this[i] is UIElement ui && ui.IsVisible)
+            {
+                lastVisible = i;
+                break;
+            }
+        }
+
+        if (lastVisible < 0)
+        {
+            return;
+        }
+
         for (int i = 0; i < Count; i++)
         {
             var child = this[i];
@@ -144,9 +181,10 @@ public sealed class DockPanel : Panel
                 continue;
             }
 
-            bool isLastFill = LastChildFill && i == last;
+            bool isLastFill = LastChildFill && i == lastVisible;
             var dock = GetDock(child);
             var desired = child.DesiredSize;
+            bool addSpacing = spacing > 0 && i != lastVisible;
 
             if (isLastFill)
             {
@@ -160,28 +198,28 @@ public sealed class DockPanel : Panel
                 {
                     var w = Math.Min(desired.Width, Math.Max(0, right - left));
                     child.Arrange(new Rect(left, top, w, Math.Max(0, bottom - top)));
-                    left += w;
+                    left += w + (addSpacing ? spacing : 0);
                     break;
                 }
                 case Dock.Right:
                 {
                     var w = Math.Min(desired.Width, Math.Max(0, right - left));
                     child.Arrange(new Rect(Math.Max(left, right - w), top, w, Math.Max(0, bottom - top)));
-                    right -= w;
+                    right -= w + (addSpacing ? spacing : 0);
                     break;
                 }
                 case Dock.Top:
                 {
                     var h = Math.Min(desired.Height, Math.Max(0, bottom - top));
                     child.Arrange(new Rect(left, top, Math.Max(0, right - left), h));
-                    top += h;
+                    top += h + (addSpacing ? spacing : 0);
                     break;
                 }
                 case Dock.Bottom:
                 {
                     var h = Math.Min(desired.Height, Math.Max(0, bottom - top));
                     child.Arrange(new Rect(left, Math.Max(top, bottom - h), Math.Max(0, right - left), h));
-                    bottom -= h;
+                    bottom -= h + (addSpacing ? spacing : 0);
                     break;
                 }
             }

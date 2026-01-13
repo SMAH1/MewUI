@@ -203,6 +203,12 @@ public static class PanelExtensions
         return panel;
     }
 
+    public static DockPanel Spacing(this DockPanel panel, double spacing)
+    {
+        panel.Spacing = spacing;
+        return panel;
+    }
+
     #endregion
 }
 
