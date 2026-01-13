@@ -101,9 +101,9 @@ public sealed class TabControl : Control
         }
     }
 
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
+    protected override Color DefaultBackground => Theme.Current.Palette.ContainerBackground;
 
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public override bool Focusable => true;
 
@@ -287,7 +287,7 @@ public sealed class TabControl : Control
         }
 
         var stripBg = GetTabStripBackground(theme);
-        var contentBg = theme.ControlBackground;
+        var contentBg = theme.Palette.ContainerBackground;
 
         var headerRect = new Rect(inner.X, inner.Y, inner.Width, Math.Max(0, headerH));
         var contentRect = new Rect(
@@ -475,7 +475,7 @@ public sealed class TabControl : Control
 
     internal Color GetTabStripBackground(Theme theme) => theme.Palette.ButtonFace;
 
-    internal Color GetTabBackground(Theme theme, bool isSelected) => isSelected ? theme.ControlBackground: GetTabStripBackground(theme);
+    internal Color GetTabBackground(Theme theme, bool isSelected) => isSelected ? theme.Palette.ContainerBackground : GetTabStripBackground(theme);
 
     private void DrawContentOutline(IGraphicsContext context, Rect contentRect, Color color, double thickness)
     {

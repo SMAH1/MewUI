@@ -16,8 +16,8 @@ internal sealed class TabHeaderButton : ContentControl
     public bool IsTabEnabled { get; set; } = true;
     public Action<int>? Clicked { get; set; }
 
-    protected override Color DefaultBackground => Theme.Current.ButtonFace;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ButtonFace;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public TabHeaderButton()
     {
@@ -48,24 +48,24 @@ internal sealed class TabHeaderButton : ContentControl
         var state = GetVisualState(isPressed: _isPressed, isActive: _isPressed);
 
         var host = Parent?.Parent as TabControl;
-        var tabBg = host?.GetTabBackground(theme, IsSelected) ?? (IsSelected ? theme.ControlBackground : theme.ButtonFace);
-        var outline = host?.GetOutlineColor(theme) ?? theme.ControlBorder;
+        var tabBg = host?.GetTabBackground(theme, IsSelected) ?? (IsSelected ? theme.Palette.ControlBackground : theme.Palette.ButtonFace);
+        var outline = host?.GetOutlineColor(theme) ?? theme.Palette.ControlBorder;
 
         Color bg = tabBg;
         if (!IsEnabled || !IsTabEnabled)
         {
-            bg = theme.ButtonDisabledBackground;
+            bg = theme.Palette.ButtonDisabledBackground;
         }
         else if (state.IsPressed)
         {
-            bg = theme.ButtonPressedBackground;
+            bg = theme.Palette.ButtonPressedBackground;
         }
         else if (state.IsHot && !IsSelected)
         {
-            bg = theme.ButtonHoverBackground;
+            bg = theme.Palette.ButtonHoverBackground;
         }
 
-        var border = IsSelected ? outline : theme.ControlBorder;
+        var border = IsSelected ? outline : theme.Palette.ControlBorder;
 
         // Top-only rounding via clipping:
         // Draw a taller rounded-rect, then clip to the real bounds so the bottom corners are clipped away.

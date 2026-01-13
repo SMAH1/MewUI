@@ -10,8 +10,8 @@ namespace Aprillz.MewUI.Controls;
 /// </summary>
 public sealed class GroupBox : HeaderedContentControl
 {
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ContainerBackground;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public double HeaderInset
     {

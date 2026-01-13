@@ -13,7 +13,7 @@ public sealed class Slider : RangeBase
 
     public double SmallChange { get; set; } = 1;
 
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public override bool Focusable => true;
 
@@ -70,13 +70,13 @@ public sealed class Slider : RangeBase
         var trackRect = new Rect(contentBounds.X, trackY, contentBounds.Width, trackHeight);
 
         var trackBg = IsEnabled
-            ? theme.ControlBackground.Lerp(theme.WindowText, 0.12)
-            : theme.TextBoxDisabledBackground;
+            ? theme.Palette.ControlBackground.Lerp(theme.Palette.WindowText, 0.12)
+            : theme.Palette.DisabledControlBackground;
 
         context.FillRoundedRectangle(trackRect, 2, 2, trackBg);
         if (IsEnabled)
         {
-            var trackBorder = trackBg.Lerp(theme.WindowText, 0.12);
+            var trackBorder = trackBg.Lerp(theme.Palette.WindowText, 0.12);
             context.DrawRoundedRectangle(trackRect, 2, 2, trackBorder, 1);
         }
 
@@ -85,7 +85,7 @@ public sealed class Slider : RangeBase
         var fillRect = new Rect(trackRect.X, trackRect.Y, trackRect.Width * t, trackRect.Height);
         if (fillRect.Width > 0)
         {
-            context.FillRoundedRectangle(fillRect, 2, 2, theme.Accent);
+            context.FillRoundedRectangle(fillRect, 2, 2, theme.Palette.Accent);
         }
 
         // Thumb
@@ -96,7 +96,7 @@ public sealed class Slider : RangeBase
         double thumbY = contentBounds.Y + (contentBounds.Height - thumbSize) / 2;
         var thumbRect = new Rect(thumbX, thumbY, thumbSize, thumbSize);
 
-        var thumbFill = IsEnabled ? theme.ControlBackground : theme.TextBoxDisabledBackground;
+        var thumbFill = IsEnabled ? theme.Palette.ControlBackground : theme.Palette.DisabledControlBackground;
       
         context.FillEllipse(thumbRect, thumbFill);
 

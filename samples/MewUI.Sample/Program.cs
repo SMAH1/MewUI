@@ -23,7 +23,8 @@ metricsTimer.Tick += (_, _) => UpdateMetrics(appendLog: false);
 Window window;
 Button enabledButton = null!;
 var accentSwatches = new List<(Color color, Button button)>();
-var currentAccent = Theme.Current.Accent;
+//Theme.Current = Theme.Current with { ControlCornerRadius = 10 };
+var currentAccent = Theme.Current.Palette.Accent;
 
 var vm = new DemoViewModel();
 var logo = ImageSource.FromFile("logo-256.png");
@@ -349,7 +350,7 @@ Element NormalControls()
                                 ),
 
                             new ListBox()
-                                .Margin(16,0,0,0)
+                                .Margin(16, 0, 0, 0)
                                 .Height(106)
                                 .Items("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth")
                                 .SelectedIndex(1)
@@ -357,7 +358,7 @@ Element NormalControls()
                 ),
 
                 tabs
-                    .Margin(0,12,0,0)
+                    .Margin(0, 12, 0, 0)
         );
 }
 
@@ -508,7 +509,7 @@ void UpdateAccentSwatches()
 {
     foreach (var (color, button) in accentSwatches)
     {
-        bool selected = Theme.Current.Accent == color;
+        bool selected = Theme.Current.Palette.Accent == color;
         button.BorderThickness = selected ? 2 : 1;
     }
 }
@@ -516,7 +517,10 @@ void UpdateAccentSwatches()
 void ApplyAccent(Color accent)
 {
     currentAccent = accent;
-    Theme.Current = window.Theme = window.Theme.WithAccent(accent);
+
+    var isDark = Palette.IsDarkBackground(Theme.Current.Palette.WindowBackground);
+
+    Theme.Current = window.Theme = isDark? Theme.Dark.WithAccent(accent): Theme.Light.WithAccent(accent);
     UpdateAccentSwatches();
 }
 

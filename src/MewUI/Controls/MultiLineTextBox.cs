@@ -34,8 +34,8 @@ public sealed class MultiLineTextBox : TextBase
     private readonly ScrollBar _vBar;
     private readonly ScrollBar _hBar;
 
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public MultiLineTextBox()
     {
@@ -83,9 +83,12 @@ public sealed class MultiLineTextBox : TextBase
             _horizontalOffset = 0;
             InvalidateMeasure();
             InvalidateVisual();
+            WrapChanged?.Invoke(_wrap);
         }
     }
 
+    public Action<bool>? WrapChanged { get; set; }
+	
     protected override string NormalizeText(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -225,18 +228,18 @@ public sealed class MultiLineTextBox : TextBase
         {
             if (IsFocused)
             {
-                borderColor = theme.Accent;
+                borderColor = theme.Palette.Accent;
             }
             else if (IsMouseOver)
             {
-                borderColor = BorderBrush.Lerp(theme.Accent, 0.6);
+                borderColor = BorderBrush.Lerp(theme.Palette.Accent, 0.6);
             }
         }
 
         DrawBackgroundAndBorder(
             context,
             bounds,
-            IsEnabled ? Background : theme.TextBoxDisabledBackground,
+            IsEnabled ? Background : theme.Palette.DisabledControlBackground,
             borderColor,
             radius);
 
@@ -247,7 +250,7 @@ public sealed class MultiLineTextBox : TextBase
 
         if (string.IsNullOrEmpty(Text) && !string.IsNullOrEmpty(Placeholder) && !IsFocused)
         {
-            context.DrawText(Placeholder, contentBounds, font, theme.PlaceholderText,
+            context.DrawText(Placeholder, contentBounds, font, theme.Palette.PlaceholderText,
                 TextAlignment.Left, TextAlignment.Top, TextWrapping.NoWrap);
         }
         else
@@ -582,7 +585,7 @@ public sealed class MultiLineTextBox : TextBase
     {
         double lineHeight = GetLineHeight();
         int lineCount = Math.Max(1, _lineStarts.Count);
-        var textColor = IsEnabled ? Foreground : theme.DisabledText;
+        var textColor = IsEnabled ? Foreground : theme.Palette.DisabledText;
 
         if (!_wrap)
         {
@@ -670,7 +673,7 @@ public sealed class MultiLineTextBox : TextBase
             return;
         }
 
-        context.FillRectangle(caretRect, theme.WindowText);
+        context.FillRectangle(caretRect, theme.Palette.WindowText);
     }
 
     private void SetCaretFromPoint(Point p, Rect contentBounds)
@@ -1010,6 +1013,9 @@ public sealed class MultiLineTextBox : TextBase
 
         using var measure = BeginTextMeasurement();
         double max = 0;
+
+        var count = 0;
+
         for (int i = 0; i < _lineStarts.Count; i++)
         {
             GetLineSpan(i, out int s, out int e);
@@ -1017,7 +1023,10 @@ public sealed class MultiLineTextBox : TextBase
             {
                 continue;
             }
-
+            if (count++ > 4096)
+            {
+                break;
+            }
             max = Math.Max(max, measure.Context.MeasureText(GetLineText(i, s, e), measure.Font).Width);
         }
         return max;
@@ -1188,7 +1197,7 @@ public sealed class MultiLineTextBox : TextBase
         double beforeW = string.IsNullOrEmpty(before) ? 0 : context.MeasureText(before, font).Width;
         double selW = string.IsNullOrEmpty(selected) ? 0 : context.MeasureText(selected, font).Width;
 
-        context.FillRectangle(new Rect(xBase + beforeW, y, selW, GetLineHeight()), theme.SelectionBackground);
+        context.FillRectangle(new Rect(xBase + beforeW, y, selW, GetLineHeight()), theme.Palette.SelectionBackground);
     }
 
     private void DrawCaretForWrappedRow(
@@ -1218,7 +1227,7 @@ public sealed class MultiLineTextBox : TextBase
         int rel = Math.Clamp(caret - rowStart, 0, rowText.Length);
         string before = rel <= 0 ? string.Empty : rowText.Substring(0, rel);
         double x = contentBounds.X + (string.IsNullOrEmpty(before) ? 0 : context.MeasureText(before, font).Width);
-        context.FillRectangle(new Rect(x, y, 1, GetLineHeight()), theme.WindowText);
+        context.FillRectangle(new Rect(x, y, 1, GetLineHeight()), theme.Palette.WindowText);
     }
 
     private static int GetCharIndexFromXInString(double x, string text, IGraphicsContext context, IFont font)
@@ -1306,7 +1315,7 @@ public sealed class MultiLineTextBox : TextBase
     {
         if (string.IsNullOrEmpty(text))
         {
-            return new[] { 0 };
+            return Array.Empty<int>();
         }
 
         var segments = new List<int>(8) { 0 };

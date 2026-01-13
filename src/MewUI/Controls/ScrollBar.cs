@@ -55,14 +55,14 @@ public sealed class ScrollBar : RangeBase
         var track = GetTrackRect(bounds, theme);
         var thumb = GetThumbRect(track, theme);
 
-        var thumbColor = theme.ScrollBarThumb;
+        var thumbColor = theme.Palette.ScrollBarThumb;
         if (_dragging || IsMouseCaptured)
         {
-            thumbColor = theme.ScrollBarThumbActive;
+            thumbColor = theme.Palette.ScrollBarThumbActive;
         }
         else if (IsMouseOver)
         {
-            thumbColor = theme.ScrollBarThumbHover;
+            thumbColor = theme.Palette.ScrollBarThumbHover;
         }
 
         double radius = Math.Min(theme.ScrollBarThickness / 2, theme.ControlCornerRadius);
@@ -248,10 +248,10 @@ public sealed class ScrollBar : RangeBase
             return LayoutRounding.SnapRectEdgesToPixels(new Rect(x, y, visual, h), dpiScale);
         }
 
-        double hy = bounds.Y + pad;
-        double hx = bounds.X + pad;
+        double y0 = bounds.Y + pad;
+        double x0 = bounds.X + pad;
         double w = Math.Max(0, bounds.Width - pad * 2);
-        return LayoutRounding.SnapRectEdgesToPixels(new Rect(hx, hy, w, visual), dpiScale);
+        return LayoutRounding.SnapRectEdgesToPixels(new Rect(x0, y0, w, visual), dpiScale);
     }
 
     private Rect GetThumbHitRect(Rect thumbVisual, Rect hitBounds)

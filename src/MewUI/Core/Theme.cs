@@ -34,26 +34,6 @@ public record class Theme
 
     public Palette Palette { get; }
 
-    public Color WindowBackground => Palette.WindowBackground;
-    public Color WindowText => Palette.WindowText;
-    public Color ControlBackground => Palette.ControlBackground;
-    public Color ControlBorder => Palette.ControlBorder;
-
-    public Color ButtonFace => Palette.ButtonFace;
-    public Color ButtonHoverBackground => Palette.ButtonHoverBackground;
-    public Color ButtonPressedBackground => Palette.ButtonPressedBackground;
-    public Color ButtonDisabledBackground => Palette.ButtonDisabledBackground;
-
-    public Color Accent => Palette.Accent;
-    public Color AccentText => Palette.AccentText;
-    public Color SelectionBackground => Palette.SelectionBackground;
-    public Color SelectionText => Palette.SelectionText;
-
-    public Color DisabledText => Palette.DisabledText;
-    public Color PlaceholderText => Palette.PlaceholderText;
-    public Color TextBoxDisabledBackground => Palette.TextBoxDisabledBackground;
-    public Color FocusRect => Palette.FocusRect;
-
     public double BaseControlHeight { get; init; }
 
     public double ControlCornerRadius { get; init; }
@@ -69,9 +49,6 @@ public record class Theme
     public double ScrollWheelStep { get; init; }
     public double ScrollBarSmallChange { get; init; }
     public double ScrollBarLargeChange { get; init; }
-    public Color ScrollBarThumb => Palette.ScrollBarThumb;
-    public Color ScrollBarThumbHover => Palette.ScrollBarThumbHover;
-    public Color ScrollBarThumbActive => Palette.ScrollBarThumbActive;
 
     public Theme WithAccent(Color accent, Color? accentText = null)
     {
@@ -133,11 +110,12 @@ public record class Theme
     {
         var palette = new Palette(
             name: "Light",
-            windowBackground: Color.FromRgb(244, 244, 244),
-            windowText: Color.FromRgb(30, 30, 30),
-            controlBackground: Color.White,
-            buttonFace: Color.FromRgb(232, 232, 232),
-            buttonDisabledBackground: Color.FromRgb(204, 204, 204),
+            baseColors: new ThemeSeed(
+                WindowBackground: Color.FromRgb(244, 244, 244),
+                WindowText: Color.FromRgb(30, 30, 30),
+                ControlBackground: Color.White,
+                ButtonFace: Color.FromRgb(232, 232, 232),
+                ButtonDisabledBackground: Color.FromRgb(204, 204, 204)),
             accent: Color.FromRgb(214, 176, 82));
 
         return new Theme(
@@ -160,11 +138,12 @@ public record class Theme
     {
         var palette = new Palette(
             name: "Dark",
-            windowBackground: Color.FromRgb(28, 28, 28),
-            windowText: Color.FromRgb(230, 230, 232),
-            controlBackground: Color.FromRgb(26, 26, 27),
-            buttonFace: Color.FromRgb(48, 48, 50),
-            buttonDisabledBackground: Color.FromRgb(60, 60, 64),
+            baseColors: new ThemeSeed(
+                WindowBackground: Color.FromRgb(28, 28, 28),
+                WindowText: Color.FromRgb(230, 230, 232),
+                ControlBackground: Color.FromRgb(26, 26, 27),
+                ButtonFace: Color.FromRgb(48, 48, 50),
+                ButtonDisabledBackground: Color.FromRgb(60, 60, 64)),
             accent: Color.FromRgb(214, 165, 94));
 
         return new Theme(

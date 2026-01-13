@@ -28,6 +28,11 @@ public class Window : ContentControl
     private bool _firstFrameRenderedPending;
     private bool _subscribedToDispatcherChanged;
 
+    public Window()
+    {
+        Padding = new Thickness(16);
+    }
+
     private sealed class PopupEntry
     {
         public required UIElement Element { get; init; }
@@ -252,9 +257,9 @@ public class Window : ContentControl
 
     protected override void OnThemeChanged(Theme oldTheme, Theme newTheme)
     {
-        if (Background == oldTheme.WindowBackground)
+        if (Background == oldTheme.Palette.WindowBackground)
         {
-            Background = newTheme.WindowBackground;
+            Background = newTheme.Palette.WindowBackground;
         }
 
         base.OnThemeChanged(oldTheme, newTheme);
@@ -428,7 +433,7 @@ public class Window : ContentControl
         }
 
         using var context = GraphicsFactory.CreateContext(Handle, hdc, DpiScale);
-        context.Clear(Background.A > 0 ? Background : Theme.WindowBackground);
+        context.Clear(Background.A > 0 ? Background : Theme.Palette.WindowBackground);
 
         // Ensure nothing paints outside the client area.
         var clientSize = _clientSizeDip.IsEmpty ? new Size(Width, Height) : _clientSizeDip;

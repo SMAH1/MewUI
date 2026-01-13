@@ -20,7 +20,7 @@ public abstract class Control : FrameworkElement, IDisposable
     private FontWeight? _fontWeight;
 
     protected virtual Color DefaultBackground => Color.Transparent;
-    protected virtual Color DefaultForeground => Theme.Current.WindowText;
+    protected virtual Color DefaultForeground => Theme.Current.Palette.WindowText;
     protected virtual Color DefaultBorderBrush => Color.Transparent;
     protected virtual string DefaultFontFamily => Theme.Current.FontFamily;
     protected virtual double DefaultFontSize => Theme.Current.FontSize;
@@ -294,12 +294,12 @@ public abstract class Control : FrameworkElement, IDisposable
 
         if (state.IsFocused || state.IsActive || state.IsPressed)
         {
-            return theme.Accent;
+            return theme.Palette.Accent;
         }
 
         if (state.IsHot)
         {
-            return baseBorder.Lerp(theme.Accent, hoverMix);
+            return baseBorder.Lerp(theme.Palette.Accent, hoverMix);
         }
 
         return baseBorder;
@@ -315,11 +315,11 @@ public abstract class Control : FrameworkElement, IDisposable
         outer = GetSnappedBorderBounds(outer);
         if (radius > 0)
         {
-            context.DrawRoundedRectangle(outer, radius, radius, theme.Accent.WithAlpha(alpha), stroke);
+            context.DrawRoundedRectangle(outer, radius, radius, theme.Palette.Accent.WithAlpha(alpha), stroke);
         }
         else
         {
-            context.DrawRectangle(outer, theme.Accent.WithAlpha(alpha), stroke);
+            context.DrawRectangle(outer, theme.Palette.Accent.WithAlpha(alpha), stroke);
         }
     }
 

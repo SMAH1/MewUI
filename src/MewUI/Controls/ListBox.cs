@@ -65,8 +65,8 @@ public class ListBox : Control
 
     public override bool Focusable => true;
 
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public ListBox()
     {
@@ -239,17 +239,17 @@ public class ListBox : Control
         var borderInset = GetBorderVisualInset();
         double itemRadius = Math.Max(0, radius - borderInset);
 
-        var bg = IsEnabled ? Background : theme.TextBoxDisabledBackground;
+        var bg = IsEnabled ? Background : theme.Palette.DisabledControlBackground;
         var borderColor = BorderBrush;
         if (IsEnabled)
         {
             if (IsFocused)
             {
-                borderColor = theme.Accent;
+                borderColor = theme.Palette.Accent;
             }
             else if (IsMouseOver)
             {
-                borderColor = BorderBrush.Lerp(theme.Accent, 0.6);
+                borderColor = BorderBrush.Lerp(theme.Palette.Accent, 0.6);
             }
         }
         DrawBackgroundAndBorder(context, bounds, bg, borderColor, radius);
@@ -290,7 +290,7 @@ public class ListBox : Control
             bool selected = i == SelectedIndex;
             if (selected)
             {
-                var selectionBg = theme.SelectionBackground;
+                var selectionBg = theme.Palette.SelectionBackground;
                 if (itemRadius > 0)
                 {
                     context.FillRoundedRectangle(itemRect, itemRadius, itemRadius, selectionBg);
@@ -301,7 +301,7 @@ public class ListBox : Control
                 }
             }
 
-            var textColor = selected ? theme.SelectionText : (IsEnabled ? Foreground : theme.DisabledText);
+            var textColor = selected ? theme.Palette.SelectionText : (IsEnabled ? Foreground : theme.Palette.DisabledText);
             context.DrawText(_items[i] ?? string.Empty, itemRect.Deflate(ItemPadding), font, textColor,
                 TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }

@@ -9,8 +9,8 @@ public sealed class ProgressBar : RangeBase
 {
     private ValueBinding<double>? _valueBinding;
 
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public ProgressBar()
     {
@@ -53,7 +53,7 @@ public sealed class ProgressBar : RangeBase
         var borderInset = GetBorderVisualInset();
         var contentBounds = bounds.Deflate(Padding).Deflate(new Thickness(borderInset));
 
-        var bg = IsEnabled ? Background : theme.TextBoxDisabledBackground;
+        var bg = IsEnabled ? Background : theme.Palette.DisabledControlBackground;
         DrawBackgroundAndBorder(context, bounds, bg, BorderBrush, radius);
 
         double t = GetNormalizedValue();
@@ -64,11 +64,11 @@ public sealed class ProgressBar : RangeBase
             if (radius - 1 > 0)
             {
                 double rx = Math.Min(radius - 1, fillRect.Width / 2.0);
-                context.FillRoundedRectangle(fillRect, rx, rx, theme.Accent);
+                context.FillRoundedRectangle(fillRect, rx, rx, theme.Palette.Accent);
             }
             else
             {
-                context.FillRectangle(fillRect, theme.Accent);
+                context.FillRectangle(fillRect, theme.Palette.Accent);
             }
         }
     }

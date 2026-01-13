@@ -258,7 +258,7 @@ internal sealed class Win32WindowBackend : IWindowBackend
 
         if (Window.Background.A == 0)
         {
-            Window.Background = Window.Theme.WindowBackground;
+            Window.Background = Window.Theme.Palette.WindowBackground;
         }
     }
 

@@ -47,27 +47,12 @@ public class CheckBox : ToggleBase
         double boxY = contentBounds.Y + (contentBounds.Height - boxSize) / 2;
         var boxRect = new Rect(contentBounds.X, boxY, boxSize, boxSize);
 
-        var fill = state.IsEnabled ? theme.ControlBackground : theme.TextBoxDisabledBackground;
-        var radius = Math.Max(0, theme.ControlCornerRadius * 0.5);
-        if (radius > 0)
-        {
-            context.FillRoundedRectangle(boxRect, radius, radius, fill);
-        }
-        else
-        {
-            context.FillRectangle(boxRect, fill);
-        }
+        var fill = state.IsEnabled ? theme.Palette.ControlBackground : theme.Palette.DisabledControlBackground;
+        var radius = Math.Max(0, theme.ControlCornerRadius * 0.5); 
 
         var borderColor = PickAccentBorder(theme, BorderBrush, state, hoverMix: 0.6);
         var stroke = Math.Max(1, BorderThickness);
-        if (radius > 0)
-        {
-            context.DrawRoundedRectangle(boxRect, radius, radius, borderColor, stroke);
-        }
-        else
-        {
-            context.DrawRectangle(boxRect, borderColor, stroke);
-        }
+        DrawBackgroundAndBorder(context, boxRect, fill, borderColor, radius);
 
         if (IsChecked)
         {
@@ -75,14 +60,14 @@ public class CheckBox : ToggleBase
             var p1 = new Point(boxRect.X + 3, boxRect.Y + boxRect.Height * 0.55);
             var p2 = new Point(boxRect.X + boxRect.Width * 0.45, boxRect.Bottom - 3);
             var p3 = new Point(boxRect.Right - 3, boxRect.Y + 3);
-            context.DrawLine(p1, p2, theme.Accent, 2);
-            context.DrawLine(p2, p3, theme.Accent, 2);
+            context.DrawLine(p1, p2, theme.Palette.Accent, 2);
+            context.DrawLine(p2, p3, theme.Palette.Accent, 2);
         }
 
         if (!string.IsNullOrEmpty(Text))
         {
             var font = GetFont();
-            var textColor = state.IsEnabled ? Foreground : theme.DisabledText;
+            var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
             var textBounds = new Rect(contentBounds.X + boxSize + spacing, contentBounds.Y, contentBounds.Width - boxSize - spacing, contentBounds.Height);
             context.DrawText(Text, textBounds, font, textColor, TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }

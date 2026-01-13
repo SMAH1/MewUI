@@ -162,7 +162,7 @@ public class RadioButton : ToggleBase
         double boxY = contentBounds.Y + (contentBounds.Height - boxSize) / 2;
         var circleRect = new Rect(contentBounds.X, boxY, boxSize, boxSize);
 
-        var fill = state.IsEnabled ? theme.ControlBackground : theme.TextBoxDisabledBackground;
+        var fill = state.IsEnabled ? theme.Palette.ControlBackground : theme.Palette.DisabledControlBackground;
         context.FillEllipse(circleRect, fill);
 
         var borderColor = PickAccentBorder(theme, BorderBrush, state, hoverMix: 0.6);
@@ -171,13 +171,13 @@ public class RadioButton : ToggleBase
         if (IsChecked)
         {
             var inner = circleRect.Inflate(-4, -4);
-            context.FillEllipse(inner, theme.Accent);
+            context.FillEllipse(inner, theme.Palette.Accent);
         }
 
         if (!string.IsNullOrEmpty(Text))
         {
             var font = GetFont();
-            var textColor = state.IsEnabled ? Foreground : theme.DisabledText;
+            var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
             var textBounds = new Rect(contentBounds.X + boxSize + spacing, contentBounds.Y, contentBounds.Width - boxSize - spacing, contentBounds.Height);
             context.DrawText(Text, textBounds, font, textColor, TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }

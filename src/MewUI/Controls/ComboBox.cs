@@ -92,8 +92,8 @@ public sealed class ComboBox : Control, IPopupOwner
 
     public override bool Focusable => true;
 
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public ComboBox()
     {
@@ -158,18 +158,18 @@ public sealed class ComboBox : Control, IPopupOwner
         var borderInset = GetBorderVisualInset();
         double radius = theme.ControlCornerRadius;
 
-        var bg = IsEnabled ? Background : theme.TextBoxDisabledBackground;
+        var bg = IsEnabled ? Background : theme.Palette.DisabledControlBackground;
 
         var borderColor = BorderBrush;
         if (IsEnabled)
         {
             if (IsFocused)
             {
-                borderColor = theme.Accent;
+                borderColor = theme.Palette.Accent;
             }
             else if (IsMouseOver)
             {
-                borderColor = BorderBrush.Lerp(theme.Accent, 0.6);
+                borderColor = BorderBrush.Lerp(theme.Palette.Accent, 0.6);
             }
         }
 
@@ -184,11 +184,11 @@ public sealed class ComboBox : Control, IPopupOwner
             .Deflate(Padding);
 
         string text = SelectedItem ?? string.Empty;
-        var textColor = IsEnabled ? Foreground : theme.DisabledText;
+        var textColor = IsEnabled ? Foreground : theme.Palette.DisabledText;
         if (string.IsNullOrEmpty(text) && !string.IsNullOrEmpty(Placeholder) && !IsFocused)
         {
             text = Placeholder;
-            textColor = theme.PlaceholderText;
+            textColor = theme.Palette.PlaceholderText;
         }
 
         if (!string.IsNullOrEmpty(text))
@@ -197,7 +197,7 @@ public sealed class ComboBox : Control, IPopupOwner
         }
 
         // Arrow
-        DrawArrow(context, headerRect, IsEnabled ? textColor : theme.DisabledText, isUp: IsDropDownOpen);
+        DrawArrow(context, headerRect, IsEnabled ? textColor : theme.Palette.DisabledText, isUp: IsDropDownOpen);
 
         if (IsDropDownOpen)
         {

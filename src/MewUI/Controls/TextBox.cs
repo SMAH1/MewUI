@@ -13,8 +13,8 @@ public class TextBox : TextBase
     private double _scrollOffset;
     private bool _suppressTextInputTab;
 
-    protected override Color DefaultBackground => Theme.Current.ControlBackground;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public TextBox()
     {
@@ -70,7 +70,7 @@ public class TextBox : TextBase
         DrawBackgroundAndBorder(
             context,
             bounds,
-            state.IsEnabled ? Background : theme.TextBoxDisabledBackground,
+            state.IsEnabled ? Background : theme.Palette.DisabledControlBackground,
             borderColor,
             radius);
 
@@ -83,7 +83,7 @@ public class TextBox : TextBase
         // Draw placeholder or text
         if (string.IsNullOrEmpty(Text) && !string.IsNullOrEmpty(Placeholder) && !state.IsFocused)
         {
-            context.DrawText(Placeholder, contentBounds, font, theme.PlaceholderText,
+            context.DrawText(Placeholder, contentBounds, font, theme.Palette.PlaceholderText,
                 TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }
         else if (!string.IsNullOrEmpty(Text))
@@ -91,27 +91,29 @@ public class TextBox : TextBase
             // Calculate text position with scroll offset
             var textX = contentBounds.X - _scrollOffset;
 
+            var text = Text.AsSpan();
             // Draw selection background if any
             if (_selectionLength != 0 && IsFocused)
             {
                 var selStart = Math.Min(_selectionStart, _selectionStart + _selectionLength);
                 var selEnd = Math.Max(_selectionStart, _selectionStart + _selectionLength);
 
-                var beforeSel = Text[..selStart];
-                var selection = Text[selStart..selEnd];
+
+                var beforeSel = text[..selStart];
+                var selection = text[selStart..selEnd];
 
                 var beforeWidth = context.MeasureText(beforeSel, font).Width;
                 var selWidth = context.MeasureText(selection, font).Width;
 
                 var selRect = new Rect(textX + beforeWidth, contentBounds.Y,
                     selWidth, contentBounds.Height);
-                context.FillRectangle(selRect, theme.SelectionBackground);
+                context.FillRectangle(selRect, theme.Palette.SelectionBackground);
             }
 
             // Draw text
-            var textColor = state.IsEnabled ? Foreground : theme.DisabledText;
+            var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
             // Use backend vertical centering (font metrics differ from FontSize across renderers).
-            context.DrawText(Text, new Rect(textX, contentBounds.Y, 1_000_000, contentBounds.Height), font, textColor,
+            context.DrawText(text, new Rect(textX, contentBounds.Y, 1_000_000, contentBounds.Height), font, textColor,
                 TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }
 
@@ -129,7 +131,7 @@ public class TextBox : TextBase
             context.DrawLine(
                 new Point(caretX, contentBounds.Y + 2),
                 new Point(caretX, contentBounds.Bottom - 2),
-                theme.WindowText, 1);
+                theme.Palette.WindowText, 1);
         }
 
         context.Restore();
@@ -331,7 +333,8 @@ public class TextBox : TextBase
 
     private int GetCharacterIndexFromX(double x)
     {
-        if (string.IsNullOrEmpty(Text))
+        var text = Text.AsSpan();
+        if (text.IsEmpty)
         {
             return 0;
         }
@@ -355,7 +358,7 @@ public class TextBox : TextBase
         while (lo < hi)
         {
             int mid = lo + ((hi - lo) / 2);
-            double w = mid > 0 ? measure.Context.MeasureText(Text[..mid], measure.Font).Width : 0;
+            double w = mid > 0 ? measure.Context.MeasureText(text[..mid], measure.Font).Width : 0;
             if (w < x)
             {
                 lo = mid + 1;
@@ -366,7 +369,7 @@ public class TextBox : TextBase
             }
         }
 
-        int idx = Math.Clamp(lo, 0, Text.Length);
+        int idx = Math.Clamp(lo, 0, text.Length);
 
         // Snap to the nearest caret position using midpoints for better feel.
         if (idx <= 0)
@@ -374,8 +377,8 @@ public class TextBox : TextBase
             return 0;
         }
 
-        double w0 = measure.Context.MeasureText(Text[..(idx - 1)], measure.Font).Width;
-        double w1 = measure.Context.MeasureText(Text[..idx], measure.Font).Width;
+        double w0 = measure.Context.MeasureText(text[..(idx - 1)], measure.Font).Width;
+        double w1 = measure.Context.MeasureText(text[..idx], measure.Font).Width;
         return x < (w0 + w1) / 2 ? idx - 1 : idx;
     }
 
@@ -525,7 +528,7 @@ public class TextBox : TextBase
         using var measure = BeginTextMeasurement();
 
         var caretX = CaretPosition > 0
-            ? measure.Context.MeasureText(Text[..CaretPosition], measure.Font).Width
+            ? measure.Context.MeasureText(Text.AsSpan()[..CaretPosition], measure.Font).Width
             : 0;
 
         if (caretX - _scrollOffset > contentBounds.Width - 5)

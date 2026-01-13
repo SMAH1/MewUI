@@ -15,13 +15,13 @@ public class Button : Control
     private ValueBinding<string>? _contentBinding;
     private Func<bool>? _canClick;
 
-    protected override Color DefaultBackground => Theme.Current.ButtonFace;
-    protected override Color DefaultBorderBrush => Theme.Current.ControlBorder;
+    protected override Color DefaultBackground => Theme.Current.Palette.ButtonFace;
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
     public Button()
     {
         BorderThickness = 1;
-        Padding = new Thickness(12, 4, 12, 4);
+        Padding = new Thickness(8, 4, 8, 4);
         MinHeight = Theme.Current.BaseControlHeight;
     }
 
@@ -92,15 +92,15 @@ public class Button : Control
 
         if (!state.IsEnabled)
         {
-            bgColor = theme.ButtonDisabledBackground;
+            bgColor = theme.Palette.ButtonDisabledBackground;
         }
         else if (state.IsPressed)
         {
-            bgColor = theme.ButtonPressedBackground;
+            bgColor = theme.Palette.ButtonPressedBackground;
         }
         else if (state.IsHot)
         {
-            bgColor = theme.ButtonHoverBackground;
+            bgColor = theme.Palette.ButtonHoverBackground;
         }
         else
         {
@@ -114,7 +114,7 @@ public class Button : Control
         {
             var contentBounds = bounds.Deflate(Padding).Deflate(new Thickness(GetBorderVisualInset()));
             var font = GetFont();
-            var textColor = state.IsEnabled ? Foreground : theme.DisabledText;
+        var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
 
             context.DrawText(Content, contentBounds, font, textColor,
                 TextAlignment.Center, TextAlignment.Center, TextWrapping.NoWrap);
