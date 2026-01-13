@@ -9,6 +9,7 @@ namespace Aprillz.MewUI.Panels;
 /// Base class for layout panels that contain multiple children.
 /// </summary>
 public abstract class Panel : Control
+    , IVisualTreeHost
 {
     private readonly List<Element> _children = new();
 
@@ -152,5 +153,13 @@ public abstract class Panel : Control
         }
 
         return null;
+    }
+
+    void IVisualTreeHost.VisitChildren(Action<Element> visitor)
+    {
+        for (int i = 0; i < _children.Count; i++)
+        {
+            visitor(_children[i]);
+        }
     }
 }

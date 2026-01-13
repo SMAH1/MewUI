@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+
 using Aprillz.MewUI.Core;
 using Aprillz.MewUI.Elements;
 using Aprillz.MewUI.Input;
@@ -28,14 +31,16 @@ public class Window : ContentControl
     private sealed class PopupEntry
     {
         public required UIElement Element { get; init; }
+
         public required UIElement Owner { get; init; }
+
         public Rect Bounds { get; set; }
     }
 
     private sealed class RadioGroupManager
     {
         private readonly Dictionary<string, WeakReference<RadioButton>> _namedSelected = new(StringComparer.Ordinal);
-        private readonly Dictionary<Element, WeakReference<RadioButton>> _unnamedSelected = new();
+        private readonly ConditionalWeakTable<Element, WeakReference<RadioButton>> _unnamedSelected = new();
 
         public void Checked(RadioButton source, string? groupName, Element? parentScope)
         {
@@ -62,7 +67,8 @@ public class Window : ContentControl
             _unnamedSelected.TryGetValue(parentScope, out var existingScopeRef);
             var existingScope = TryGet(existingScopeRef);
 
-            _unnamedSelected[parentScope] = new WeakReference<RadioButton>(source);
+            _unnamedSelected.Remove(parentScope);
+            _unnamedSelected.Add(parentScope, new WeakReference<RadioButton>(source));
 
             if (existingScope != null && existingScope != source && existingScope.IsChecked)
             {
@@ -183,12 +189,19 @@ public class Window : ContentControl
     #region Events
 
     public Action? Loaded { get; set; }
+
     public Action? Closed { get; set; }
+
     public Action? Activated { get; set; }
+
     public Action? Deactivated { get; set; }
+
     public Action<Size>? SizeChanged { get; set; }
+
     public Action<uint, uint>? DpiChanged { get; set; }
+
     public Action<Theme, Theme>? ThemeChanged { get; set; }
+
     public Action? FirstFrameRendered { get; set; }
 
     /// <summary>
@@ -196,6 +209,7 @@ public class Window : ContentControl
     /// If <see cref="KeyEventArgs.Handled"/> is set, the focused element will not receive the event.
     /// </summary>
     public Action<KeyEventArgs>? PreviewKeyDown { get; set; }
+
     public Action<KeyEventArgs>? PreviewKeyUp { get; set; }
 
     /// <summary>

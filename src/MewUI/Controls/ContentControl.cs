@@ -8,6 +8,7 @@ namespace Aprillz.MewUI.Controls;
 /// A control that contains a single child element.
 /// </summary>
 public class ContentControl : Control
+    , IVisualTreeHost
 {
     /// <summary>
     /// Gets or sets the content element.
@@ -92,5 +93,13 @@ public class ContentControl : Control
         }
 
         return null;
+    }
+
+    void IVisualTreeHost.VisitChildren(Action<Element> visitor)
+    {
+        if (Content != null)
+        {
+            visitor(Content);
+        }
     }
 }

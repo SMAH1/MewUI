@@ -11,19 +11,9 @@ internal static class VisualTree
 
         visitor(element);
 
-        if (element is Panels.Panel panel)
+        if (element is IVisualTreeHost host)
         {
-            foreach (var child in panel.Children)
-            {
-                Visit(child, visitor);
-            }
-
-            return;
-        }
-
-        if (element is Controls.ContentControl contentControl && contentControl.Content != null)
-        {
-            Visit(contentControl.Content, visitor);
+            host.VisitChildren(child => Visit(child, visitor));
         }
     }
 }

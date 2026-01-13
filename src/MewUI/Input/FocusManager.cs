@@ -93,20 +93,19 @@ public sealed class FocusManager
             return uiElement;
         }
 
-        if (root is Panels.Panel panel)
+        if (root is IVisualTreeHost host)
         {
-            foreach (var child in panel.Children)
+            UIElement? found = null;
+            host.VisitChildren(child =>
             {
-                var hit = FindFirstFocusable(child);
-                if (hit != null)
+                if (found != null)
                 {
-                    return hit;
+                    return;
                 }
-            }
-        }
-        else if (root is Controls.ContentControl contentControl && contentControl.Content != null)
-        {
-            return FindFirstFocusable(contentControl.Content);
+
+                found = FindFirstFocusable(child);
+            });
+            return found;
         }
 
         return null;
@@ -224,16 +223,9 @@ public sealed class FocusManager
             AddIfFocusable(uiElement, result);
         }
 
-        if (element is Panels.Panel panel)
+        if (element is IVisualTreeHost host)
         {
-            foreach (var child in panel.Children)
-            {
-                CollectFocusableElementsCore(child, result);
-            }
-        }
-        else if (element is Controls.ContentControl contentControl && contentControl.Content != null)
-        {
-            CollectFocusableElementsCore(contentControl.Content, result);
+            host.VisitChildren(child => CollectFocusableElementsCore(child, result));
         }
     }
 

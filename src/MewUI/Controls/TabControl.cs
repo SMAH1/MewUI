@@ -8,6 +8,7 @@ using Aprillz.MewUI.Rendering;
 namespace Aprillz.MewUI.Controls;
 
 public sealed class TabControl : Control
+    , IVisualTreeHost
 {
     private readonly List<TabItem> _tabs = new();
     private readonly StackPanel _headerStrip;
@@ -130,6 +131,12 @@ public sealed class TabControl : Control
         EnsureValidSelection();
         InvalidateMeasure();
         InvalidateVisual();
+    }
+
+    void IVisualTreeHost.VisitChildren(Action<Element> visitor)
+    {
+        visitor(_headerStrip);
+        visitor(_contentHost);
     }
 
     public void AddTabs(params TabItem[] tabs)
