@@ -86,12 +86,12 @@ public interface IGraphicsContext : IDisposable
     /// <summary>
     /// Draws text at the specified location.
     /// </summary>
-    void DrawText(string text, Point location, IFont font, Color color);
+    void DrawText(ReadOnlySpan<char> text, Point location, IFont font, Color color);
 
     /// <summary>
     /// Draws text within the specified bounds with alignment options.
     /// </summary>
-    void DrawText(string text, Rect bounds, IFont font, Color color,
+    void DrawText(ReadOnlySpan<char> text, Rect bounds, IFont font, Color color,
         TextAlignment horizontalAlignment = TextAlignment.Left,
         TextAlignment verticalAlignment = TextAlignment.Top,
         TextWrapping wrapping = TextWrapping.NoWrap);
@@ -99,12 +99,12 @@ public interface IGraphicsContext : IDisposable
     /// <summary>
     /// Measures the size of the specified text.
     /// </summary>
-    Size MeasureText(string text, IFont font);
+    Size MeasureText(ReadOnlySpan<char> text, IFont font);
 
     /// <summary>
     /// Measures the size of the specified text within a constrained width.
     /// </summary>
-    Size MeasureText(string text, IFont font, double maxWidth);
+    Size MeasureText(ReadOnlySpan<char> text, IFont font, double maxWidth);
 
     #endregion
 

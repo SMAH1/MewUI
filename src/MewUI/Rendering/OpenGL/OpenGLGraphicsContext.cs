@@ -452,23 +452,23 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
 
     #region Text Rendering
 
-    public void DrawText(string text, Point location, IFont font, Color color)
+    public void DrawText(ReadOnlySpan<char> text, Point location, IFont font, Color color)
     {
-        if (string.IsNullOrEmpty(text))
+        if (text.IsEmpty)
         {
             return;
         }
 
         DrawText(text, new Rect(location.X, location.Y, 0, 0), font, color, TextAlignment.Left, TextAlignment.Top,
-            text.AsSpan().IndexOfAny('\r', '\n') >= 0 ? TextWrapping.Wrap : TextWrapping.NoWrap);
+            text.IndexOfAny('\r', '\n') >= 0 ? TextWrapping.Wrap : TextWrapping.NoWrap);
     }
 
-    public void DrawText(string text, Rect bounds, IFont font, Color color,
+    public void DrawText(ReadOnlySpan<char> text, Rect bounds, IFont font, Color color,
         TextAlignment horizontalAlignment = TextAlignment.Left,
         TextAlignment verticalAlignment = TextAlignment.Top,
         TextWrapping wrapping = TextWrapping.NoWrap)
     {
-        if (string.IsNullOrEmpty(text))
+        if (text.IsEmpty)
         {
             return;
         }
@@ -503,25 +503,31 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
 
         if (OperatingSystem.IsWindows() && font is GdiFont gdiFont)
         {
-            var key = new OpenGLTextCacheKey(text, gdiFont.Handle, FontId: string.Empty, FontSizePx: 0, color.ToArgb(), widthPx, heightPx,
+            var key = new OpenGLTextCacheKey(string.GetHashCode(text), gdiFont.Handle, FontId: string.Empty, FontSizePx: 0, color.ToArgb(), widthPx, heightPx,
                 (int)horizontalAlignment, (int)verticalAlignment, (int)wrapping);
 
-            var texture = _resources.TextCache.GetOrCreateTexture(_resources.SupportsBgra, _hdc, key,
-                () => OpenGLTextRasterizer.Rasterize(_hdc, gdiFont, text, widthPx, heightPx, color, horizontalAlignment, verticalAlignment, wrapping));
+            if (!_resources.TextCache.TryGet(_resources.SupportsBgra, _hdc, key, out var texture))
+            {
+                var bmp = OpenGLTextRasterizer.Rasterize(_hdc, gdiFont, text, widthPx, heightPx, color, horizontalAlignment, verticalAlignment, wrapping);
+                texture = _resources.TextCache.CreateTexture(_resources.SupportsBgra, _hdc, key, ref bmp);
+            }
 
-            DrawTexturedQuad(boundsPx, texture);
+            DrawTexturedQuad(boundsPx, ref texture);
             return;
         }
 
         if (OperatingSystem.IsLinux() && font is FreeTypeFont ftFont)
         {
-            var key = new OpenGLTextCacheKey(text, 0, ftFont.FontPath, ftFont.PixelHeight, color.ToArgb(), widthPx, heightPx,
+            var key = new OpenGLTextCacheKey(string.GetHashCode(text), 0, ftFont.FontPath, ftFont.PixelHeight, color.ToArgb(), widthPx, heightPx,
                 (int)horizontalAlignment, (int)verticalAlignment, (int)wrapping);
 
-            var texture = _resources.TextCache.GetOrCreateTexture(_resources.SupportsBgra, _hdc, key,
-                () => FreeTypeText.Rasterize(text, ftFont, widthPx, heightPx, color, horizontalAlignment, verticalAlignment, wrapping));
+            if (!_resources.TextCache.TryGet(_resources.SupportsBgra, _hdc, key, out var texture))
+            {
+                var bmp = FreeTypeText.Rasterize(text, ftFont, widthPx, heightPx, color, horizontalAlignment, verticalAlignment, wrapping);
+                texture = _resources.TextCache.CreateTexture(_resources.SupportsBgra, _hdc, key, ref bmp);
+            }
 
-            DrawTexturedQuad(boundsPx, texture);
+            DrawTexturedQuad(boundsPx, ref texture);
         }
     }
 
@@ -552,7 +558,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         return Math.Clamp(remaining, 1, hardMax);
     }
 
-    public Size MeasureText(string text, IFont font)
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -570,7 +576,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         return measureFallback.MeasureText(text, font);
     }
 
-    public Size MeasureText(string text, IFont font, double maxWidth)
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font, double maxWidth)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -589,7 +595,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         return measureFallback.MeasureText(text, font, maxWidth);
     }
 
-    private static void DrawTexturedQuad(RECT boundsPx, OpenGLTextureEntry texture)
+    private static void DrawTexturedQuad(RECT boundsPx, ref OpenGLTextureEntry texture)
     {
         GL.Enable(GL.GL_TEXTURE_2D);
         GL.BindTexture(GL.GL_TEXTURE_2D, texture.TextureId);

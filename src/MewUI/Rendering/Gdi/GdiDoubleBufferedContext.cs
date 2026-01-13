@@ -173,10 +173,10 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
     public void FillRoundedRectangle(Rect rect, double radiusX, double radiusY, Color color) => _context.FillRoundedRectangle(rect, radiusX, radiusY, color);
     public void DrawEllipse(Rect bounds, Color color, double thickness = 1) => _context.DrawEllipse(bounds, color, thickness);
     public void FillEllipse(Rect bounds, Color color) => _context.FillEllipse(bounds, color);
-    public void DrawText(string text, Point location, IFont font, Color color) => _context.DrawText(text, location, font, color);
-    public void DrawText(string text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap) => _context.DrawText(text, bounds, font, color, horizontalAlignment, verticalAlignment, wrapping);
-    public Size MeasureText(string text, IFont font) => _context.MeasureText(text, font);
-    public Size MeasureText(string text, IFont font, double maxWidth) => _context.MeasureText(text, font, maxWidth);
+    public void DrawText(ReadOnlySpan<char> text, Point location, IFont font, Color color) => _context.DrawText(text, location, font, color);
+    public void DrawText(ReadOnlySpan<char> text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap) => _context.DrawText(text, bounds, font, color, horizontalAlignment, verticalAlignment, wrapping);
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font) => _context.MeasureText(text, font);
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font, double maxWidth) => _context.MeasureText(text, font, maxWidth);
     public void DrawImage(IImage image, Point location) => _context.DrawImage(image, location);
     public void DrawImage(IImage image, Rect destRect) => _context.DrawImage(image, destRect);
     public void DrawImage(IImage image, Rect destRect, Rect sourceRect) => _context.DrawImage(image, destRect, sourceRect);

@@ -5,7 +5,7 @@ using Aprillz.MewUI.Native;
 namespace Aprillz.MewUI.Rendering.OpenGL;
 
 internal readonly record struct OpenGLTextCacheKey(
-    string Text,
+    int TextHash,
     nint FontHandle,
     string FontId,
     int FontSizePx,
@@ -37,11 +37,11 @@ internal sealed class OpenGLTextCache : IDisposable
         set => _maxBytes = Math.Max(0, value);
     }
 
-    public OpenGLTextureEntry GetOrCreateTexture(
+    public bool TryGet(
         bool supportsBgra,
         nint hdc,
         OpenGLTextCacheKey key,
-        Func<OpenGLTextBitmap> factory)
+        out OpenGLTextureEntry entry)
     {
         if (_disposed)
         {
@@ -52,10 +52,21 @@ internal sealed class OpenGLTextCache : IDisposable
         {
             _lru.Remove(node);
             _lru.AddFirst(node);
-            return node.Value.Entry;
+            entry = node.Value.Entry;
+
+            return true;
         }
 
-        var bmp = factory();
+        entry = default;
+        return false;
+    }
+
+    public OpenGLTextureEntry CreateTexture(
+        bool supportsBgra,
+        nint hdc,
+        OpenGLTextCacheKey key,
+        ref OpenGLTextBitmap bmp)
+    {
         uint tex = UploadTexture(supportsBgra, bmp);
         var entry = new OpenGLTextureEntry(tex, bmp.WidthPx, bmp.HeightPx);
 

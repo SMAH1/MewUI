@@ -168,17 +168,17 @@ internal static partial class Gdi32
 
     #region Drawing - Text
 
-    [LibraryImport(LibraryName, EntryPoint = "TextOutW", StringMarshalling = StringMarshalling.Utf16)]
+    [LibraryImport(LibraryName, EntryPoint = "TextOutW")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool TextOut(nint hdc, int x, int y, string lpString, int c);
+    public static unsafe partial bool TextOut(nint hdc, int x, int y, char* lpString, int c);
 
-    [LibraryImport(LibraryName, EntryPoint = "ExtTextOutW", StringMarshalling = StringMarshalling.Utf16)]
+    [LibraryImport(LibraryName, EntryPoint = "ExtTextOutW")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool ExtTextOut(nint hdc, int x, int y, uint options, ref RECT lprect, string lpString, int c, nint lpDx);
+    public static unsafe partial bool ExtTextOut(nint hdc, int x, int y, uint options, ref RECT lprect, char* lpString, int c, nint lpDx);
 
-    [LibraryImport("user32.dll", EntryPoint = "DrawTextW", StringMarshalling = StringMarshalling.Utf16)]
-    public static partial int DrawText(nint hdc, string lpchText, int cchText, ref RECT lprc, uint format);
-
+    [LibraryImport("user32.dll", EntryPoint = "DrawTextW")]
+    public static unsafe partial int DrawText(nint hdc, char* lpchText, int cchText, ref RECT lprc, uint format);
+    
     [LibraryImport(LibraryName)]
     public static partial uint SetTextColor(nint hdc, uint color);
 

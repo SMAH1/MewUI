@@ -17,9 +17,9 @@ internal sealed class OpenGLMeasurementContext : IGraphicsContext
 
     public void Dispose() { }
 
-    public Size MeasureText(string text, IFont font)
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font)
     {
-        if (string.IsNullOrEmpty(text))
+        if (text.IsEmpty)
         {
             return Size.Empty;
         }
@@ -73,7 +73,7 @@ internal sealed class OpenGLMeasurementContext : IGraphicsContext
         return new Size(width, height);
     }
 
-    public Size MeasureText(string text, IFont font, double maxWidth)
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font, double maxWidth)
     {
         if (double.IsNaN(maxWidth) || maxWidth <= 0 || double.IsInfinity(maxWidth))
         {
@@ -95,9 +95,17 @@ internal sealed class OpenGLMeasurementContext : IGraphicsContext
 
         double size = font.Size <= 0 ? 12 : font.Size;
         double charsPerLine = Math.Max(1, maxWidth / (size * 0.6));
-        double totalChars = text.Count(c => c != '\r' && c != '\n');
-        double lines = Math.Ceiling(totalChars / charsPerLine);
-        double height = lines * size * 1.25;
+        int totalChars = 0;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c != '\r' && c != '\n')
+            {
+                totalChars++;
+            }
+        }
+        double lineCount = Math.Ceiling(totalChars / charsPerLine);
+        double height = lineCount * size * 1.25;
         return new Size(maxWidth, height);
     }
 
@@ -113,8 +121,8 @@ internal sealed class OpenGLMeasurementContext : IGraphicsContext
     public void FillRoundedRectangle(Rect rect, double radiusX, double radiusY, Color color) { }
     public void DrawEllipse(Rect bounds, Color color, double thickness = 1) { }
     public void FillEllipse(Rect bounds, Color color) { }
-    public void DrawText(string text, Point location, IFont font, Color color) { }
-    public void DrawText(string text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap) { }
+    public void DrawText(ReadOnlySpan<char> text, Point location, IFont font, Color color) { }
+    public void DrawText(ReadOnlySpan<char> text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap) { }
     public void DrawImage(IImage image, Point location) { }
     public void DrawImage(IImage image, Rect destRect) { }
     public void DrawImage(IImage image, Rect destRect, Rect sourceRect) { }

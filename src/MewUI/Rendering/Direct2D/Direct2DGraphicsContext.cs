@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+
 using Aprillz.MewUI.Native.Com;
 using Aprillz.MewUI.Native.Direct2D;
 using Aprillz.MewUI.Native.DirectWrite;
@@ -8,38 +9,38 @@ using Aprillz.MewUI.Resources;
 
 namespace Aprillz.MewUI.Rendering.Direct2D;
 
-internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext 
-{ 
-    private const int D2DERR_RECREATE_TARGET = unchecked((int)0x8899000C); 
+internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
+{
+    private const int D2DERR_RECREATE_TARGET = unchecked((int)0x8899000C);
     private const int D2DERR_WRONG_RESOURCE_DOMAIN = unchecked((int)0x88990015);
- 
-    private readonly nint _hwnd; 
-    private readonly nint _dwriteFactory; 
-    private readonly Action? _onRecreateTarget; 
- 
+
+    private readonly nint _hwnd;
+    private readonly nint _dwriteFactory;
+    private readonly Action? _onRecreateTarget;
+
     private nint _renderTarget; // ID2D1RenderTarget* 
     private readonly int _renderTargetGeneration;
-    private readonly Dictionary<uint, nint> _solidBrushes = new(); 
-    private readonly Stack<(double tx, double ty, int clipDepth)> _states = new(); 
-    private double _translateX; 
-    private double _translateY; 
+    private readonly Dictionary<uint, nint> _solidBrushes = new();
+    private readonly Stack<(double tx, double ty, int clipDepth)> _states = new();
+    private double _translateX;
+    private double _translateY;
     private int _clipDepth;
     private bool _disposed;
- 
-    public double DpiScale { get; } 
- 
-    public Direct2DGraphicsContext(nint hwnd, double dpiScale, nint renderTarget, int renderTargetGeneration, nint dwriteFactory, Action? onRecreateTarget) 
-    { 
-        _hwnd = hwnd; 
-        _dwriteFactory = dwriteFactory; 
-        _onRecreateTarget = onRecreateTarget; 
-        DpiScale = dpiScale; 
- 
-        _renderTarget = renderTarget; 
+
+    public double DpiScale { get; }
+
+    public Direct2DGraphicsContext(nint hwnd, double dpiScale, nint renderTarget, int renderTargetGeneration, nint dwriteFactory, Action? onRecreateTarget)
+    {
+        _hwnd = hwnd;
+        _dwriteFactory = dwriteFactory;
+        _onRecreateTarget = onRecreateTarget;
+        DpiScale = dpiScale;
+
+        _renderTarget = renderTarget;
         _renderTargetGeneration = renderTargetGeneration;
         D2D1VTable.BeginDraw((ID2D1RenderTarget*)_renderTarget);
         D2D1VTable.SetTextAntialiasMode((ID2D1RenderTarget*)_renderTarget, D2D1_TEXT_ANTIALIAS_MODE.CLEARTYPE);
-    } 
+    }
 
     [Conditional("DEBUG")]
     private static void AssertHr(int hr, string op)
@@ -259,12 +260,12 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
         D2D1VTable.FillEllipse((ID2D1RenderTarget*)_renderTarget, ellipse, brush);
     }
 
-    public void DrawText(string text, Point location, IFont font, Color color) =>
+    public void DrawText(ReadOnlySpan<char> text, Point location, IFont font, Color color) =>
         DrawText(text, new Rect(location.X, location.Y, 1_000_000, 1_000_000), font, color, TextAlignment.Left, TextAlignment.Top, TextWrapping.NoWrap);
 
-    public void DrawText(string text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap)
+    public void DrawText(ReadOnlySpan<char> text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap)
     {
-        if (_renderTarget == 0 || string.IsNullOrEmpty(text))
+        if (_renderTarget == 0 || text.IsEmpty)
         {
             return;
         }
@@ -312,11 +313,11 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
         }
     }
 
-    public Size MeasureText(string text, IFont font) => MeasureText(text, font, float.MaxValue);
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font) => MeasureText(text, font, float.MaxValue);
 
-    public Size MeasureText(string text, IFont font, double maxWidth)
+    public Size MeasureText(ReadOnlySpan<char> text, IFont font, double maxWidth)
     {
-        if (string.IsNullOrEmpty(text))
+        if (text.IsEmpty)
         {
             return Size.Empty;
         }

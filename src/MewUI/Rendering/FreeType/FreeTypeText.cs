@@ -4,6 +4,7 @@ using Aprillz.MewUI.Native.FreeType;
 using Aprillz.MewUI.Primitives;
 using Aprillz.MewUI.Rendering;
 using Aprillz.MewUI.Rendering.OpenGL;
+
 using FT = Aprillz.MewUI.Native.FreeType.FreeType;
 
 namespace Aprillz.MewUI.Rendering.FreeType;
@@ -12,9 +13,9 @@ internal static unsafe class FreeTypeText
 {
     private static readonly byte[] EmptyPixel = new byte[4];
 
-    public static Size Measure(string text, FreeTypeFont font)
+    public static Size Measure(ReadOnlySpan<char> text, FreeTypeFont font)
     {
-        if (string.IsNullOrEmpty(text))
+        if (text.IsEmpty)
         {
             return Size.Empty;
         }
@@ -27,8 +28,9 @@ internal static unsafe class FreeTypeText
         int lines = 1;
         uint prevGlyph = 0;
 
-        foreach (char ch in text)
+        for (int i = 0; i < text.Length; i++)
         {
+            char ch = text[i];
             if (ch == '\r')
             {
                 continue;
@@ -65,7 +67,7 @@ internal static unsafe class FreeTypeText
     }
 
     public static OpenGLTextBitmap Rasterize(
-        string text,
+        ReadOnlySpan<char> text,
         FreeTypeFont font,
         int widthPx,
         int heightPx,
@@ -74,7 +76,7 @@ internal static unsafe class FreeTypeText
         TextAlignment vAlign,
         TextWrapping wrapping)
     {
-        if (string.IsNullOrEmpty(text))
+        if (text.IsEmpty)
         {
             return new OpenGLTextBitmap(1, 1, EmptyPixel);
         }
@@ -179,7 +181,7 @@ internal static unsafe class FreeTypeText
                 }
             }
 
-        Advance:
+            Advance:
             penX += face.GetAdvancePx(code);
         }
 

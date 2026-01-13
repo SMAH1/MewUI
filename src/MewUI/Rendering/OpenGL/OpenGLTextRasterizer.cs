@@ -12,10 +12,10 @@ internal static class OpenGLTextRasterizer
 {
     private static readonly byte[] EmptyPixel = new byte[4];
 
-    public static OpenGLTextBitmap Rasterize(
+    public unsafe static OpenGLTextBitmap Rasterize(
         nint hdcWindow,
         GdiFont font,
-        string text,
+        ReadOnlySpan<char> text,
         int widthPx,
         int heightPx,
         Color color,
@@ -79,7 +79,10 @@ internal static class OpenGLTextRasterizer
                     _ => GdiConstants.DT_TOP
                 };
 
-                Gdi32.DrawText(memDc, text, text.Length, ref rect, format);
+                fixed (char* pText = text)
+                {
+                    Gdi32.DrawText(memDc, pText, text.Length, ref rect, format);
+                }
 
                 int bytes = widthPx * heightPx * 4;
                 var bgra = new byte[bytes];

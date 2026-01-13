@@ -32,9 +32,9 @@ internal sealed class GdiMeasurementContext : IGraphicsContext
         }
     }
 
-    public Size MeasureText(string text, IFont font)
+    public unsafe Size MeasureText(ReadOnlySpan<char> text, IFont font)
     {
-        if (string.IsNullOrEmpty(text) || font is not GdiFont gdiFont)
+        if (text.IsEmpty || font is not GdiFont gdiFont)
         {
             return Size.Empty;
         }
@@ -42,7 +42,7 @@ internal sealed class GdiMeasurementContext : IGraphicsContext
         var oldFont = Gdi32.SelectObject(_hdc, gdiFont.Handle);
         try
         {
-            var hasLineBreaks = text.AsSpan().IndexOfAny('\r', '\n') >= 0;
+            var hasLineBreaks = text.IndexOfAny('\r', '\n') >= 0;
             var rect = hasLineBreaks
                 ? new RECT(0, 0, LayoutRounding.RoundToPixelInt(1_000_000, _dpiScale), 0)
                 : new RECT(0, 0, 0, 0);
@@ -51,18 +51,21 @@ internal sealed class GdiMeasurementContext : IGraphicsContext
                 ? GdiConstants.DT_CALCRECT | GdiConstants.DT_WORDBREAK | GdiConstants.DT_NOPREFIX
                 : GdiConstants.DT_CALCRECT | GdiConstants.DT_SINGLELINE | GdiConstants.DT_NOPREFIX;
 
-            Gdi32.DrawText(_hdc, text, text.Length, ref rect, format);
+            fixed (char* pText = text)
+            {
+                Gdi32.DrawText(_hdc, pText, text.Length, ref rect, format);
+            }
             return new Size(rect.Width / _dpiScale, rect.Height / _dpiScale);
         }
-        finally
+        finally     
         {
             Gdi32.SelectObject(_hdc, oldFont);
         }
     }
 
-    public Size MeasureText(string text, IFont font, double maxWidth)
+    public unsafe Size MeasureText(ReadOnlySpan<char> text, IFont font, double maxWidth)
     {
-        if (string.IsNullOrEmpty(text) || font is not GdiFont gdiFont)
+        if (text.IsEmpty || font is not GdiFont gdiFont)
         {
             return Size.Empty;
         }
@@ -82,8 +85,11 @@ internal sealed class GdiMeasurementContext : IGraphicsContext
         try
         {
             var rect = new RECT(0, 0, maxWidthPx, 0);
-            Gdi32.DrawText(_hdc, text, text.Length, ref rect,
-                GdiConstants.DT_CALCRECT | GdiConstants.DT_WORDBREAK | GdiConstants.DT_NOPREFIX);
+            fixed (char* pText = text)
+            {
+                Gdi32.DrawText(_hdc, pText, text.Length, ref rect,
+                    GdiConstants.DT_CALCRECT | GdiConstants.DT_WORDBREAK | GdiConstants.DT_NOPREFIX);
+            }
             return new Size(rect.Width / _dpiScale, rect.Height / _dpiScale);
         }
         finally
@@ -105,8 +111,8 @@ internal sealed class GdiMeasurementContext : IGraphicsContext
     public void FillRoundedRectangle(Rect rect, double radiusX, double radiusY, Color color) { }
     public void DrawEllipse(Rect bounds, Color color, double thickness = 1) { }
     public void FillEllipse(Rect bounds, Color color) { }
-    public void DrawText(string text, Point location, IFont font, Color color) { }
-    public void DrawText(string text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap) { }
+    public void DrawText(ReadOnlySpan<char> text, Point location, IFont font, Color color) { }
+    public void DrawText(ReadOnlySpan<char> text, Rect bounds, IFont font, Color color, TextAlignment horizontalAlignment = TextAlignment.Left, TextAlignment verticalAlignment = TextAlignment.Top, TextWrapping wrapping = TextWrapping.NoWrap) { }
     public void DrawImage(IImage image, Point location) { }
     public void DrawImage(IImage image, Rect destRect) { }
     public void DrawImage(IImage image, Rect destRect, Rect sourceRect) { }

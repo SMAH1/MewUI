@@ -55,6 +55,25 @@ internal static unsafe class DWriteVTable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int CreateTextLayout(
+        IDWriteFactory* factory,
+        ReadOnlySpan<char> text,
+        nint textFormat,
+        float maxWidth,
+        float maxHeight,
+        out nint textLayout)
+    {
+        nint layout = 0;
+        fixed (char* pText = text)
+        {
+            var fn = (delegate* unmanaged[Stdcall]<IDWriteFactory*, char*, uint, nint, float, float, nint*, int>)factory->lpVtbl[CreateTextLayoutIndex];
+            int hr = fn(factory, pText, (uint)text.Length, textFormat, maxWidth, maxHeight, &layout);
+            textLayout = layout;
+            return hr;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SetTextAlignment(nint textFormat, DWRITE_TEXT_ALIGNMENT alignment)
     {
         var vtbl = *(nint**)textFormat;
