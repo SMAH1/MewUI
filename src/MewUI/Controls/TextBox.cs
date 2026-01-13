@@ -3,6 +3,8 @@ using Aprillz.MewUI.Input;
 using Aprillz.MewUI.Primitives;
 using Aprillz.MewUI.Rendering;
 
+using System.Buffers;
+
 namespace Aprillz.MewUI.Controls;
 
 /// <summary>
@@ -10,9 +12,6 @@ namespace Aprillz.MewUI.Controls;
 /// </summary>
 public class TextBox : TextBase
 {
-    private double _scrollOffset;
-    private bool _suppressTextInputTab;
-
     protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
     protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
@@ -33,17 +32,23 @@ public class TextBox : TextBase
         }
     }
 
-    protected override string NormalizeText(string text)
+    protected override string NormalizePastedText(string text)
     {
+        text ??= string.Empty;
         if (text.Length == 0)
         {
             return string.Empty;
         }
 
-        text = text.Replace("\r\n", string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-        if (!AcceptTab && text.Contains('\t'))
+        // Single-line: preserve separation by converting newlines/tabs to spaces.
+        if (text.IndexOf('\r') >= 0 || text.IndexOf('\n') >= 0)
         {
-            text = text.Replace("\t", string.Empty);
+            text = text.Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ');
+        }
+
+        if (!AcceptTab && text.IndexOf('\t') >= 0)
+        {
+            text = text.Replace('\t', ' ');
         }
 
         return text;
@@ -56,47 +61,18 @@ public class TextBox : TextBase
         return new Size(100, minHeight);
     }
 
-    protected override void OnRender(IGraphicsContext context)
+    protected override void RenderTextContent(IGraphicsContext context, Rect contentBounds, IFont font, Theme theme, in VisualState state)
     {
-        var theme = GetTheme();
-        var bounds = GetSnappedBorderBounds(Bounds);
-        var borderInset = GetBorderVisualInset();
-        var contentBounds = bounds.Deflate(Padding).Deflate(new Thickness(borderInset));
-        double radius = theme.ControlCornerRadius;
-
-        var state = GetVisualState();
-        var borderColor = PickAccentBorder(theme, BorderBrush, state, hoverMix: 0.6);
-
-        DrawBackgroundAndBorder(
-            context,
-            bounds,
-            state.IsEnabled ? Background : theme.Palette.DisabledControlBackground,
-            borderColor,
-            radius);
-
-        // Set up clipping for content
-        context.Save();
-        context.SetClip(contentBounds);
-
-        var font = GetFont();
-
-        // Draw placeholder or text
-        if (string.IsNullOrEmpty(Text) && !string.IsNullOrEmpty(Placeholder) && !state.IsFocused)
-        {
-            context.DrawText(Placeholder, contentBounds, font, theme.Palette.PlaceholderText,
-                TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
-        }
-        else if (!string.IsNullOrEmpty(Text))
+        if (!Document.IsEmpty)
         {
             // Calculate text position with scroll offset
-            var textX = contentBounds.X - _scrollOffset;
+            var textX = contentBounds.X - HorizontalOffset;
 
             var text = Text.AsSpan();
             // Draw selection background if any
-            if (_selectionLength != 0 && IsFocused)
+            if (HasSelection && IsFocused)
             {
-                var selStart = Math.Min(_selectionStart, _selectionStart + _selectionLength);
-                var selEnd = Math.Max(_selectionStart, _selectionStart + _selectionLength);
+                var (selStart, selEnd) = GetSelectionRange();
 
 
                 var beforeSel = text[..selStart];
@@ -120,7 +96,7 @@ public class TextBox : TextBase
         // Draw caret if focused
         if (state.IsFocused && !IsReadOnly)
         {
-            var caretX = contentBounds.X - _scrollOffset;
+            var caretX = contentBounds.X - HorizontalOffset;
             if (CaretPosition > 0)
             {
                 var textBefore = Text[..CaretPosition];
@@ -133,208 +109,36 @@ public class TextBox : TextBase
                 new Point(caretX, contentBounds.Bottom - 2),
                 theme.Palette.WindowText, 1);
         }
-
-        context.Restore();
     }
 
-    protected override void OnMouseDown(MouseEventArgs e)
+    protected override void SetCaretFromPoint(Point point, Rect contentBounds)
     {
-        base.OnMouseDown(e);
-
-        if (e.Button == MouseButton.Left)
-        {
-            Focus();
-
-            // Calculate caret position from click
-            var contentBounds = Bounds.Deflate(Padding);
-            var clickX = e.Position.X - contentBounds.X + _scrollOffset;
-
-            CaretPosition = GetCharacterIndexFromX(clickX);
-            _selectionStart = CaretPosition;
-            _selectionLength = 0;
-
-            // Capture for selection
-            var root = FindVisualRoot();
-            if (root is Window window)
-            {
-                window.CaptureMouse(this);
-            }
-
-            EnsureCaretVisible();
-            InvalidateVisual();
-            e.Handled = true;
-        }
+        var clickX = point.X - contentBounds.X + HorizontalOffset;
+        CaretPosition = GetCharacterIndexFromX(clickX);
     }
 
-    protected override void OnMouseMove(MouseEventArgs e)
+    protected override void AutoScrollForSelectionDrag(Point point, Rect contentBounds)
     {
-        base.OnMouseMove(e);
-
-        if (IsMouseCaptured && e.LeftButton)
+        // If the pointer goes beyond the text box, scroll in that direction.
+        // This matches common native text box behavior and enables selecting off-screen text.
+        const double edgeDip = 8;
+        if (point.X < contentBounds.X + edgeDip)
         {
-            // Update selection (with auto-scroll when dragging outside the visible region)
-            var contentBounds = Bounds.Deflate(Padding);
-
-            // If the pointer goes beyond the text box, scroll in that direction.
-            // This matches common native text box behavior and enables selecting off-screen text.
-            const double edgeDip = 8;
-            if (e.Position.X < contentBounds.X + edgeDip)
-            {
-                _scrollOffset += e.Position.X - (contentBounds.X + edgeDip);
-            }
-            else if (e.Position.X > contentBounds.Right - edgeDip)
-            {
-                _scrollOffset += e.Position.X - (contentBounds.Right - edgeDip);
-            }
-
-            ClampScrollOffset();
-
-            var clickX = e.Position.X - contentBounds.X + _scrollOffset;
-
-            var newPos = GetCharacterIndexFromX(clickX);
-            _selectionLength = newPos - _selectionStart;
-            CaretPosition = newPos;
-
-            EnsureCaretVisible();
-            InvalidateVisual();
-            e.Handled = true;
+            SetHorizontalOffset(HorizontalOffset + point.X - (contentBounds.X + edgeDip), invalidateVisual: false);
         }
+        else if (point.X > contentBounds.Right - edgeDip)
+        {
+            SetHorizontalOffset(HorizontalOffset + point.X - (contentBounds.Right - edgeDip), invalidateVisual: false);
+        }
+
+        ClampScrollOffset();
     }
 
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        base.OnMouseUp(e);
-
-        if (e.Button == MouseButton.Left)
-        {
-            var root = FindVisualRoot();
-            if (root is Window window)
-            {
-                window.ReleaseMouseCapture();
-            }
-        }
-    }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-        if (e.Handled || IsReadOnly && !IsNavigationKey(e.Key))
-        {
-            return;
-        }
-
-        bool shift = e.ShiftKey;
-        bool ctrl = e.ControlKey;
-
-        switch (e.Key)
-        {
-            case Key.Tab:
-                if (!IsReadOnly && AcceptTab)
-                {
-                    DeleteSelection();
-                    InsertIntoDocument(CaretPosition, "\t".AsSpan());
-                    CaretPosition += 1;
-                    NotifyTextChanged();
-                    _suppressTextInputTab = true;
-                    EnsureCaretVisible();
-                    e.Handled = true;
-                }
-                break;
-
-            case Key.Left:
-                MoveCaret(-1, shift, ctrl);
-                e.Handled = true;
-                break;
-
-            case Key.Right:
-                MoveCaret(1, shift, ctrl);
-                e.Handled = true;
-                break;
-
-            case Key.Home:
-                MoveCaret(-Text.Length, shift, false);
-                e.Handled = true;
-                break;
-
-            case Key.End:
-                MoveCaret(Text.Length, shift, false);
-                e.Handled = true;
-                break;
-
-            case Key.Backspace:
-                if (!IsReadOnly)
-                {
-                    HandleBackspace(ctrl);
-                }
-
-                e.Handled = true;
-                break;
-
-            case Key.Delete:
-                if (!IsReadOnly)
-                {
-                    HandleDelete(ctrl);
-                }
-
-                e.Handled = true;
-                break;
-        }
-
-        InvalidateVisual();
-    }
-
-    protected override void OnTextInput(TextInputEventArgs e)
-    {
-        base.OnTextInput(e);
-        if (IsReadOnly)
-        {
-            return;
-        }
-
-        var text = e.Text ?? string.Empty;
-
-        if (_suppressTextInputTab)
-        {
-            _suppressTextInputTab = false;
-            if (text.Contains('\t'))
-            {
-                e.Handled = true;
-                return;
-            }
-        }
-
-        if (text.Contains('\r') || text.Contains('\n'))
-        {
-            text = text.Replace("\r\n", string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-        }
-
-        if (!AcceptTab && text.Contains('\t'))
-        {
-            text = text.Replace("\t", string.Empty);
-        }
-
-        if (text.Length == 0)
-        {
-            return;
-        }
-
-        // Delete selection if any
-        DeleteSelection();
-
-        // Insert text
-        InsertIntoDocument(CaretPosition, text.AsSpan());
-        CaretPosition += text.Length;
-        NotifyTextChanged();
-
-        EnsureCaretVisible();
-        InvalidateVisual();
-        e.Handled = true;
-    }
+    protected override void EnsureCaretVisibleCore(Rect contentBounds) => EnsureCaretVisible(contentBounds);
 
     private int GetCharacterIndexFromX(double x)
     {
-        var text = Text.AsSpan();
-        if (text.IsEmpty)
+        if (Document.IsEmpty)
         {
             return 0;
         }
@@ -346,198 +150,77 @@ public class TextBox : TextBase
             return 0;
         }
 
-        double totalWidth = measure.Context.MeasureText(Text, measure.Font).Width;
-        if (x >= totalWidth)
+        int length = Document.Length;
+        char[]? rented = null;
+        try
         {
-            return Text.Length;
-        }
+            Span<char> buffer = length <= 0xFFFF
+                ? stackalloc char[length]
+                : (rented = ArrayPool<char>.Shared.Rent(length)).AsSpan(0, length);
 
-        // Binary search to avoid O(n^2) measurement cost for long text.
-        int lo = 0;
-        int hi = Text.Length;
-        while (lo < hi)
-        {
-            int mid = lo + ((hi - lo) / 2);
-            double w = mid > 0 ? measure.Context.MeasureText(text[..mid], measure.Font).Width : 0;
-            if (w < x)
+            Document.CopyTo(buffer, 0, length);
+
+            double totalWidth = measure.Context.MeasureText(buffer, measure.Font).Width;
+            if (x >= totalWidth)
             {
-                lo = mid + 1;
+                return length;
             }
-            else
+
+            // Binary search to avoid O(n^2) measurement cost for long text.
+            int lo = 0;
+            int hi = length;
+            while (lo < hi)
             {
-                hi = mid;
+                int mid = lo + ((hi - lo) / 2);
+                double w = mid > 0 ? measure.Context.MeasureText(buffer[..mid], measure.Font).Width : 0;
+                if (w < x)
+                {
+                    lo = mid + 1;
+                }
+                else
+                {
+                    hi = mid;
+                }
             }
-        }
 
-        int idx = Math.Clamp(lo, 0, text.Length);
+            int idx = Math.Clamp(lo, 0, length);
 
-        // Snap to the nearest caret position using midpoints for better feel.
-        if (idx <= 0)
-        {
-            return 0;
-        }
-
-        double w0 = measure.Context.MeasureText(text[..(idx - 1)], measure.Font).Width;
-        double w1 = measure.Context.MeasureText(text[..idx], measure.Font).Width;
-        return x < (w0 + w1) / 2 ? idx - 1 : idx;
-    }
-
-    private void MoveCaret(int direction, bool extend, bool word)
-    {
-        int newPos = CaretPosition;
-
-        if (word)
-        {
-            // Move by word
-            if (direction < 0)
+            // Snap to the nearest caret position using midpoints for better feel.
+            if (idx <= 0)
             {
-                newPos = FindPreviousWordBoundary(CaretPosition);
+                return 0;
             }
-            else
+
+            double w0 = measure.Context.MeasureText(buffer[..(idx - 1)], measure.Font).Width;
+            double w1 = measure.Context.MeasureText(buffer[..idx], measure.Font).Width;
+            return x < (w0 + w1) / 2 ? idx - 1 : idx;
+        }
+        finally
+        {
+            if (rented != null)
             {
-                newPos = FindNextWordBoundary(CaretPosition);
+                ArrayPool<char>.Shared.Return(rented);
             }
         }
-        else
-        {
-            newPos = Math.Clamp(CaretPosition + direction, 0, Text.Length);
-        }
-
-        if (extend)
-        {
-            _selectionLength += newPos - CaretPosition;
-        }
-        else
-        {
-            _selectionStart = newPos;
-            _selectionLength = 0;
-        }
-
-        CaretPosition = newPos;
-        EnsureCaretVisible();
     }
 
-    private int FindPreviousWordBoundary(int from)
+    private void EnsureCaretVisible(Rect contentBounds)
     {
-        if (from <= 0)
-        {
-            return 0;
-        }
-
-        int pos = from - 1;
-        while (pos > 0 && char.IsWhiteSpace(Text[pos]))
-        {
-            pos--;
-        }
-
-        while (pos > 0 && !char.IsWhiteSpace(Text[pos - 1]))
-        {
-            pos--;
-        }
-
-        return pos;
-    }
-
-    private int FindNextWordBoundary(int from)
-    {
-        if (from >= Text.Length)
-        {
-            return Text.Length;
-        }
-
-        int pos = from;
-        while (pos < Text.Length && !char.IsWhiteSpace(Text[pos]))
-        {
-            pos++;
-        }
-
-        while (pos < Text.Length && char.IsWhiteSpace(Text[pos]))
-        {
-            pos++;
-        }
-
-        return pos;
-    }
-
-    private void HandleBackspace(bool word)
-    {
-        if (_selectionLength != 0)
-        {
-            DeleteSelection();
-        }
-        else if (CaretPosition > 0)
-        {
-            int deleteFrom = word ? FindPreviousWordBoundary(CaretPosition) : CaretPosition - 1;
-            RemoveFromDocument(deleteFrom, CaretPosition - deleteFrom);
-            CaretPosition = deleteFrom;
-            NotifyTextChanged();
-        }
-    }
-
-    private void HandleDelete(bool word)
-    {
-        if (_selectionLength != 0)
-        {
-            DeleteSelection();
-        }
-        else if (CaretPosition < Text.Length)
-        {
-            int deleteTo = word ? FindNextWordBoundary(CaretPosition) : CaretPosition + 1;
-            RemoveFromDocument(CaretPosition, deleteTo - CaretPosition);
-            NotifyTextChanged();
-        }
-    }
-
-    private void DeleteSelection()
-    {
-        if (_selectionLength == 0)
-        {
-            return;
-        }
-
-        int start = Math.Min(_selectionStart, _selectionStart + _selectionLength);
-        int length = Math.Abs(_selectionLength);
-
-        RemoveFromDocument(start, length);
-        CaretPosition = start;
-        _selectionStart = start;
-        _selectionLength = 0;
-        NotifyTextChanged();
-    }
-
-    protected override void PasteFromClipboardCore()
-    {
-        if (!TryClipboardGetText(out var text) || string.IsNullOrEmpty(text))
-        {
-            return;
-        }
-
-        // Single-line: preserve separation by converting newlines/tabs to spaces.
-        text = text.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
-        if (!AcceptTab)
-        {
-            text = text.Replace("\t", " ");
-        }
-
-        InsertTextAtCaretForEdit(text);
-    }
-
-    private void EnsureCaretVisible()
-    {
-        var contentBounds = Bounds.Deflate(Padding);
         using var measure = BeginTextMeasurement();
 
+        var text = Text.AsSpan();
+
         var caretX = CaretPosition > 0
-            ? measure.Context.MeasureText(Text.AsSpan()[..CaretPosition], measure.Font).Width
+            ? measure.Context.MeasureText(text[..CaretPosition], measure.Font).Width
             : 0;
 
-        if (caretX - _scrollOffset > contentBounds.Width - 5)
+        if (caretX - HorizontalOffset > contentBounds.Width - 5)
         {
-            _scrollOffset = caretX - contentBounds.Width + 10;
+            SetHorizontalOffset(caretX - contentBounds.Width + 10, invalidateVisual: false);
         }
-        else if (caretX - _scrollOffset < 5)
+        else if (caretX - HorizontalOffset < 5)
         {
-            _scrollOffset = Math.Max(0, caretX - 10);
+            SetHorizontalOffset(Math.Max(0, caretX - 10), invalidateVisual: false);
         }
 
         ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
@@ -545,33 +228,29 @@ public class TextBox : TextBase
 
     private void ClampScrollOffset()
     {
-        if (string.IsNullOrEmpty(Text))
+        if (Document.IsEmpty)
         {
-            _scrollOffset = 0;
+            SetHorizontalOffset(0, invalidateVisual: false);
             return;
         }
 
-        var contentBounds = Bounds.Deflate(Padding);
+        var contentBounds = GetInteractionContentBounds();
         using var measure = BeginTextMeasurement();
         ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
     }
 
     private void ClampScrollOffset(IGraphicsContext context, IFont font, double viewportWidthDip)
     {
-        if (string.IsNullOrEmpty(Text))
+        if (Document.IsEmpty)
         {
-            _scrollOffset = 0;
+            SetHorizontalOffset(0, invalidateVisual: false);
             return;
         }
 
         double textWidth = context.MeasureText(Text, font).Width;
         double maxOffset = Math.Max(0, textWidth - Math.Max(0, viewportWidthDip));
-        _scrollOffset = Math.Clamp(_scrollOffset, 0, maxOffset);
+        SetHorizontalOffset(Math.Clamp(HorizontalOffset, 0, maxOffset), invalidateVisual: false);
     }
 
-    private static bool IsNavigationKey(Input.Key key) =>
-        key is Key.Left or
-               Key.Right or
-               Key.Home or
-               Key.End;
+    // Key handling is centralized in TextBase.
 }

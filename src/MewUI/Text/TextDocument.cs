@@ -1,57 +1,97 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Aprillz.MewUI.Text;
 
-internal sealed class TextDocument
+internal sealed class TextDocument : IDisposable
 {
-    private char[] _buffer;
-    private int _gapStart;
-    private int _gapEnd;
+    private string _original = string.Empty;
+    private readonly StringBuilder _added = new();
+    private readonly List<Piece> _pieces = new();
+    private int _length;
+
+    private int[]? _lineStarts;
+    private int _lineStartsVersion = -1;
+    private int _version;
+
+    private readonly struct Piece
+    {
+        public readonly bool IsOriginal;
+        public readonly int Start;
+        public readonly int Length;
+
+        public Piece(bool isOriginal, int start, int length)
+        {
+            IsOriginal = isOriginal;
+            Start = start;
+            Length = length;
+        }
+    }
 
     public TextDocument(int initialCapacity = 256)
     {
-        initialCapacity = Math.Max(16, initialCapacity);
-        _buffer = ArrayPool<char>.Shared.Rent(initialCapacity);
-        _gapStart = 0;
-        _gapEnd = _buffer.Length;
+        // initialCapacity hint ignored for piece table
     }
 
-    public int Length => _buffer.Length - (_gapEnd - _gapStart);
+    public int Length => _length;
+
+    public bool IsEmpty => _length == 0;
+
+    public int Version => _version;
 
     public char this[int index]
     {
         get
         {
-            if ((uint)index >= (uint)Length)
+            if ((uint)index >= (uint)_length)
             {
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
 
-            int gapSize = _gapEnd - _gapStart;
-            return index < _gapStart ? _buffer[index] : _buffer[index + gapSize];
+            int offset = 0;
+            for (int i = 0; i < _pieces.Count; i++)
+            {
+                var p = _pieces[i];
+                if (index < offset + p.Length)
+                {
+                    int localIndex = index - offset + p.Start;
+                    return p.IsOriginal ? _original[localIndex] : _added[localIndex];
+                }
+                offset += p.Length;
+            }
+
+            throw new InvalidOperationException("Index out of range in piece table");
         }
     }
 
     public void SetText(string text)
     {
-        Clear();
-        if (string.IsNullOrEmpty(text))
+        _original = text ?? string.Empty;
+        _added.Clear();
+        _pieces.Clear();
+
+        if (_original.Length > 0)
         {
-            return;
+            _pieces.Add(new Piece(true, 0, _original.Length));
         }
 
-        Insert(0, text.AsSpan());
+        _length = _original.Length;
+        _version++;
     }
 
     public void Clear()
     {
-        _gapStart = 0;
-        _gapEnd = _buffer.Length;
+        _original = string.Empty;
+        _added.Clear();
+        _pieces.Clear();
+        _length = 0;
+        _version++;
     }
 
     public void Insert(int index, ReadOnlySpan<char> text)
     {
-        if ((uint)index > (uint)Length)
+        if ((uint)index > (uint)_length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
@@ -61,11 +101,44 @@ internal sealed class TextDocument
             return;
         }
 
-        MoveGap(index);
-        EnsureGap(text.Length);
+        int addedStart = _added.Length;
+        _added.Append(text);
+        var newPiece = new Piece(false, addedStart, text.Length);
 
-        text.CopyTo(_buffer.AsSpan(_gapStart, text.Length));
-        _gapStart += text.Length;
+        if (_pieces.Count == 0)
+        {
+            _pieces.Add(newPiece);
+            _length += text.Length;
+            _version++;
+            return;
+        }
+
+        int pieceIndex = FindPieceIndex(index, out int localOffset);
+
+        if (localOffset == 0)
+        {
+            _pieces.Insert(pieceIndex, newPiece);
+        }
+        else
+        {
+            var oldPiece = _pieces[pieceIndex];
+            if (localOffset == oldPiece.Length)
+            {
+                _pieces.Insert(pieceIndex + 1, newPiece);
+            }
+            else
+            {
+                var left = new Piece(oldPiece.IsOriginal, oldPiece.Start, localOffset);
+                var right = new Piece(oldPiece.IsOriginal, oldPiece.Start + localOffset, oldPiece.Length - localOffset);
+
+                _pieces[pieceIndex] = left;
+                _pieces.Insert(pieceIndex + 1, newPiece);
+                _pieces.Insert(pieceIndex + 2, right);
+            }
+        }
+
+        _length += text.Length;
+        _version++;
     }
 
     public void Remove(int index, int length)
@@ -75,14 +148,14 @@ internal sealed class TextDocument
             return;
         }
 
-        if ((uint)index > (uint)Length)
+        if ((uint)index > (uint)_length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        if (index + length > Length)
+        if (index + length > _length)
         {
-            length = Length - index;
+            length = _length - index;
         }
 
         if (length <= 0)
@@ -90,8 +163,80 @@ internal sealed class TextDocument
             return;
         }
 
-        MoveGap(index);
-        _gapEnd += length;
+        int startPiece = FindPieceIndex(index, out int startOffset);
+        int endPiece = FindPieceIndex(index + length, out int endOffset);
+
+        if (startPiece == endPiece)
+        {
+            var p = _pieces[startPiece];
+            if (startOffset == 0 && endOffset == p.Length)
+            {
+                _pieces.RemoveAt(startPiece);
+            }
+            else if (startOffset == 0)
+            {
+                _pieces[startPiece] = new Piece(p.IsOriginal, p.Start + length, p.Length - length);
+            }
+            else if (endOffset == p.Length)
+            {
+                _pieces[startPiece] = new Piece(p.IsOriginal, p.Start, startOffset);
+            }
+            else
+            {
+                var left = new Piece(p.IsOriginal, p.Start, startOffset);
+                var right = new Piece(p.IsOriginal, p.Start + endOffset, p.Length - endOffset);
+                _pieces[startPiece] = left;
+                _pieces.Insert(startPiece + 1, right);
+            }
+        }
+        else
+        {
+            var modifications = new List<(int index, Piece? replacement)>();
+
+            var startP = _pieces[startPiece];
+            if (startOffset == 0)
+            {
+                modifications.Add((startPiece, null));
+            }
+            else
+            {
+                modifications.Add((startPiece, new Piece(startP.IsOriginal, startP.Start, startOffset)));
+            }
+
+            for (int i = startPiece + 1; i < endPiece; i++)
+            {
+                modifications.Add((i, null));
+            }
+
+            if (endPiece < _pieces.Count)
+            {
+                var endP = _pieces[endPiece];
+                if (endOffset == endP.Length)
+                {
+                    modifications.Add((endPiece, null));
+                }
+                else if (endOffset > 0)
+                {
+                    modifications.Add((endPiece, new Piece(endP.IsOriginal, endP.Start + endOffset, endP.Length - endOffset)));
+                }
+            }
+
+            for (int i = modifications.Count - 1; i >= 0; i--)
+            {
+                var (idx, replacement) = modifications[i];
+                if (replacement == null)
+                {
+                    _pieces.RemoveAt(idx);
+                }
+                else
+                {
+                    _pieces[idx] = replacement.Value;
+                }
+            }
+        }
+
+        _length -= length;
+        _version++;
     }
 
     public void CopyTo(Span<char> destination, int start, int length)
@@ -101,39 +246,60 @@ internal sealed class TextDocument
             return;
         }
 
-        if ((uint)start > (uint)Length || start + length > Length)
+        if ((uint)start > (uint)_length || start + length > _length)
         {
             throw new ArgumentOutOfRangeException(nameof(start));
         }
 
-        int gapSize = _gapEnd - _gapStart;
-        if (start + length <= _gapStart)
-        {
-            _buffer.AsSpan(start, length).CopyTo(destination);
-            return;
-        }
+        int remaining = length;
+        int destOffset = 0;
+        int docOffset = 0;
 
-        if (start >= _gapStart)
+        for (int i = 0; i < _pieces.Count && remaining > 0; i++)
         {
-            _buffer.AsSpan(start + gapSize, length).CopyTo(destination);
-            return;
-        }
+            var p = _pieces[i];
+            int pieceEnd = docOffset + p.Length;
 
-        int leftLen = _gapStart - start;
-        _buffer.AsSpan(start, leftLen).CopyTo(destination);
-        int rightLen = length - leftLen;
-        _buffer.AsSpan(_gapEnd, rightLen).CopyTo(destination.Slice(leftLen, rightLen));
+            if (pieceEnd <= start)
+            {
+                docOffset = pieceEnd;
+                continue;
+            }
+
+            int copyStart = Math.Max(0, start - docOffset);
+            int copyEnd = Math.Min(p.Length, start + length - docOffset);
+            int copyLen = copyEnd - copyStart;
+
+            if (copyLen > 0)
+            {
+                if (p.IsOriginal)
+                {
+                    _original.AsSpan(p.Start + copyStart, copyLen).CopyTo(destination.Slice(destOffset));
+                }
+                else
+                {
+                    for (int j = 0; j < copyLen; j++)
+                    {
+                        destination[destOffset + j] = _added[p.Start + copyStart + j];
+                    }
+                }
+
+                destOffset += copyLen;
+                remaining -= copyLen;
+            }
+
+            docOffset = pieceEnd;
+        }
     }
 
     public string GetText()
     {
-        int length = Length;
-        if (length == 0)
+        if (_length == 0)
         {
             return string.Empty;
         }
 
-        return string.Create(length, this, static (span, doc) => doc.CopyTo(span, 0, span.Length));
+        return string.Create(_length, this, static (span, doc) => doc.CopyTo(span, 0, span.Length));
     }
 
     public string GetText(int start, int length)
@@ -143,7 +309,7 @@ internal sealed class TextDocument
             return string.Empty;
         }
 
-        if ((uint)start > (uint)Length || start + length > Length)
+        if ((uint)start > (uint)_length || start + length > _length)
         {
             throw new ArgumentOutOfRangeException(nameof(start));
         }
@@ -152,59 +318,180 @@ internal sealed class TextDocument
             state.doc.CopyTo(span, state.start, span.Length));
     }
 
+    #region Line Operations
+
+    public int LineCount
+    {
+        get
+        {
+            EnsureLineStarts();
+            return _lineStarts!.Length;
+        }
+    }
+
+    public int GetLineFromIndex(int charIndex)
+    {
+        if (charIndex < 0)
+        {
+            return 0;
+        }
+
+        if (charIndex >= _length)
+        {
+            return Math.Max(0, LineCount - 1);
+        }
+
+        EnsureLineStarts();
+        return BinarySearchLine(_lineStarts!, charIndex);
+    }
+
+    public int GetLineStartIndex(int lineNumber)
+    {
+        EnsureLineStarts();
+        if ((uint)lineNumber >= (uint)_lineStarts!.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lineNumber));
+        }
+
+        return _lineStarts[lineNumber];
+    }
+
+    public int GetLineLength(int lineNumber)
+    {
+        EnsureLineStarts();
+        if ((uint)lineNumber >= (uint)_lineStarts!.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lineNumber));
+        }
+
+        int start = _lineStarts[lineNumber];
+        int end = lineNumber + 1 < _lineStarts.Length ? _lineStarts[lineNumber + 1] : _length;
+
+        int len = end - start;
+        if (len > 0 && this[end - 1] == '\n')
+        {
+            len--;
+        }
+
+        return len;
+    }
+
+    public ReadOnlySpan<char> GetLineSpan(int lineNumber, Span<char> buffer)
+    {
+        int start = GetLineStartIndex(lineNumber);
+        int len = GetLineLength(lineNumber);
+
+        if (len == 0)
+        {
+            return ReadOnlySpan<char>.Empty;
+        }
+
+        if (buffer.Length < len)
+        {
+            throw new ArgumentException("Buffer too small", nameof(buffer));
+        }
+
+        CopyTo(buffer, start, len);
+        return buffer.Slice(0, len);
+    }
+
+    private void EnsureLineStarts()
+    {
+        if (_lineStarts != null && _lineStartsVersion == _version)
+        {
+            return;
+        }
+
+        var starts = new List<int> { 0 };
+
+        int offset = 0;
+        for (int i = 0; i < _pieces.Count; i++)
+        {
+            var p = _pieces[i];
+            ReadOnlySpan<char> span = p.IsOriginal
+                ? _original.AsSpan(p.Start, p.Length)
+                : GetAddedSpan(p.Start, p.Length);
+
+            for (int j = 0; j < span.Length; j++)
+            {
+                if (span[j] == '\n')
+                {
+                    starts.Add(offset + j + 1);
+                }
+            }
+
+            offset += p.Length;
+        }
+
+        _lineStarts = starts.ToArray();
+        _lineStartsVersion = _version;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ReadOnlySpan<char> GetAddedSpan(int start, int length)
+    {
+        char[] buffer = ArrayPool<char>.Shared.Rent(length);
+        try
+        {
+            for (int i = 0; i < length; i++)
+            {
+                buffer[i] = _added[start + i];
+            }
+            return buffer.AsSpan(0, length);
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+        }
+    }
+
+    private static int BinarySearchLine(int[] lineStarts, int charIndex)
+    {
+        int lo = 0;
+        int hi = lineStarts.Length - 1;
+
+        while (lo < hi)
+        {
+            int mid = lo + (hi - lo + 1) / 2;
+            if (lineStarts[mid] <= charIndex)
+            {
+                lo = mid;
+            }
+            else
+            {
+                hi = mid - 1;
+            }
+        }
+
+        return lo;
+    }
+
+    #endregion
+
     public void Dispose()
     {
-        ArrayPool<char>.Shared.Return(_buffer);
-        _buffer = Array.Empty<char>();
-        _gapStart = 0;
-        _gapEnd = 0;
+        _original = string.Empty;
+        _added.Clear();
+        _pieces.Clear();
+        _lineStarts = null;
+        _length = 0;
     }
 
-    private void EnsureGap(int required)
+    private int FindPieceIndex(int index, out int localOffset)
     {
-        int gapSize = _gapEnd - _gapStart;
-        if (gapSize >= required)
+        int offset = 0;
+        for (int i = 0; i < _pieces.Count; i++)
         {
-            return;
+            var p = _pieces[i];
+            if (index <= offset + p.Length)
+            {
+                localOffset = index - offset;
+                return i;
+            }
+            offset += p.Length;
         }
 
-        int needed = required - gapSize;
-        int newSize = Math.Max(_buffer.Length * 2, _buffer.Length + needed + 16);
-        var newBuffer = ArrayPool<char>.Shared.Rent(newSize);
-
-        int leftLen = _gapStart;
-        _buffer.AsSpan(0, leftLen).CopyTo(newBuffer);
-
-        int rightLen = _buffer.Length - _gapEnd;
-        int newGapEnd = newSize - rightLen;
-        _buffer.AsSpan(_gapEnd, rightLen).CopyTo(newBuffer.AsSpan(newGapEnd, rightLen));
-
-        ArrayPool<char>.Shared.Return(_buffer);
-        _buffer = newBuffer;
-        _gapEnd = newGapEnd;
-    }
-
-    private void MoveGap(int index)
-    {
-        if (index == _gapStart)
-        {
-            return;
-        }
-
-        if (index < _gapStart)
-        {
-            int move = _gapStart - index;
-            _buffer.AsSpan(index, move).CopyTo(_buffer.AsSpan(_gapEnd - move, move));
-            _gapStart -= move;
-            _gapEnd -= move;
-            return;
-        }
-
-        int gapSize = _gapEnd - _gapStart;
-        int target = index + gapSize;
-        int moveForward = target - _gapEnd;
-        _buffer.AsSpan(_gapEnd, moveForward).CopyTo(_buffer.AsSpan(_gapStart, moveForward));
-        _gapStart += moveForward;
-        _gapEnd += moveForward;
+        localOffset = 0;
+        return _pieces.Count;
     }
 }
