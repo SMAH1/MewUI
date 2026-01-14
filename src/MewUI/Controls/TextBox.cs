@@ -2,8 +2,7 @@ using Aprillz.MewUI.Core;
 using Aprillz.MewUI.Input;
 using Aprillz.MewUI.Primitives;
 using Aprillz.MewUI.Rendering;
-
-using System.Buffers;
+using Aprillz.MewUI.Text;
 
 namespace Aprillz.MewUI.Controls;
 
@@ -12,6 +11,8 @@ namespace Aprillz.MewUI.Controls;
 /// </summary>
 public class TextBox : TextBase
 {
+    private readonly TextBoxView _view = new();
+
     protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
     protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
 
@@ -21,6 +22,10 @@ public class TextBox : TextBase
         Padding = new Thickness(4);
         MinHeight = Theme.Current.BaseControlHeight;
     }
+
+    protected override Rect GetInteractionContentBounds()
+        // Keep interaction bounds consistent with rendering bounds (border inset + padding).
+        => GetViewportContentBounds();
 
     protected override void OnThemeChanged(Theme oldTheme, Theme newTheme)
     {
@@ -56,59 +61,61 @@ public class TextBox : TextBase
 
     protected override Size MeasureContent(Size availableSize)
     {
-        // Default size for empty text box
-        var minHeight = FontSize + Padding.VerticalThickness + 4;
-        return new Size(100, minHeight);
+        // Keep default sizing stable, but use actual font metrics and account for border inset.
+        var borderInset = GetBorderVisualInset();
+
+        using var measure = BeginTextMeasurement();
+        var metrics = measure.Context.MeasureText("Mg", measure.Font);
+        var lineHeight = Math.Max(FontSize, metrics.Height);
+
+        var sample = Text.AsSpan();
+        if (sample.IsEmpty)
+        {
+            sample = Placeholder.AsSpan();
+        }
+
+        if (sample.Length > 64)
+        {
+            sample = sample[..64];
+        }
+
+        double sampleWidth = sample.IsEmpty
+            ? measure.Context.MeasureText("MMMMMMMMMM", measure.Font).Width
+            : measure.Context.MeasureText(sample, measure.Font).Width;
+
+        double chromeW = Padding.HorizontalThickness + borderInset * 2;
+        double chromeH = Padding.VerticalThickness + borderInset * 2;
+
+        double desiredW = Math.Max(16, sampleWidth + chromeW + 4);
+        double desiredH = Math.Max(lineHeight + chromeH + 4, MinHeight > 0 ? MinHeight : 0);
+
+        return new Size(desiredW, desiredH);
     }
 
     protected override void RenderTextContent(IGraphicsContext context, Rect contentBounds, IFont font, Theme theme, in VisualState state)
     {
-        if (!Document.IsEmpty)
-        {
-            // Calculate text position with scroll offset
-            var textX = contentBounds.X - HorizontalOffset;
-
-            var text = Text.AsSpan();
-            // Draw selection background if any
-            if (HasSelection && IsFocused)
-            {
-                var (selStart, selEnd) = GetSelectionRange();
-
-
-                var beforeSel = text[..selStart];
-                var selection = text[selStart..selEnd];
-
-                var beforeWidth = context.MeasureText(beforeSel, font).Width;
-                var selWidth = context.MeasureText(selection, font).Width;
-
-                var selRect = new Rect(textX + beforeWidth, contentBounds.Y,
-                    selWidth, contentBounds.Height);
-                context.FillRectangle(selRect, theme.Palette.SelectionBackground);
-            }
-
-            // Draw text
-            var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
-            // Use backend vertical centering (font metrics differ from FontSize across renderers).
-            context.DrawText(text, new Rect(textX, contentBounds.Y, 1_000_000, contentBounds.Height), font, textColor,
-                TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
-        }
-
-        // Draw caret if focused
-        if (state.IsFocused && !IsReadOnly)
-        {
-            var caretX = contentBounds.X - HorizontalOffset;
-            if (CaretPosition > 0)
-            {
-                var textBefore = Text[..CaretPosition];
-                caretX += context.MeasureText(textBefore, font).Width;
-            }
-
-            // Simple caret - could be animated
-            context.DrawLine(
-                new Point(caretX, contentBounds.Y + 2),
-                new Point(caretX, contentBounds.Bottom - 2),
-                theme.Palette.WindowText, 1);
-        }
+        var (selStart, selEnd) = GetSelectionRange();
+        _view.Render(
+            context,
+            contentBounds,
+            font,
+            theme,
+            isEnabled: state.IsEnabled,
+            isFocused: state.IsFocused,
+            isReadOnly: IsReadOnly,
+            foreground: Foreground,
+            horizontalOffset: HorizontalOffset,
+            fontFamily: FontFamily,
+            fontSize: FontSize,
+            fontWeight: FontWeight,
+            dpi: GetDpi(),
+            documentVersion: DocumentVersion,
+            caretPosition: CaretPosition,
+            hasSelection: HasSelection,
+            selectionStart: selStart,
+            selectionEnd: selEnd,
+            textLength: Document.Length,
+            copyTextTo: (buffer, start, length) => Document.CopyTo(buffer, start, length));
     }
 
     protected override void SetCaretFromPoint(Point point, Rect contentBounds)
@@ -138,118 +145,63 @@ public class TextBox : TextBase
 
     private int GetCharacterIndexFromX(double x)
     {
-        if (Document.IsEmpty)
-        {
-            return 0;
-        }
-
         using var measure = BeginTextMeasurement();
-
-        if (x <= 0)
-        {
-            return 0;
-        }
-
-        int length = Document.Length;
-        char[]? rented = null;
-        try
-        {
-            Span<char> buffer = length <= 0xFFFF
-                ? stackalloc char[length]
-                : (rented = ArrayPool<char>.Shared.Rent(length)).AsSpan(0, length);
-
-            Document.CopyTo(buffer, 0, length);
-
-            double totalWidth = measure.Context.MeasureText(buffer, measure.Font).Width;
-            if (x >= totalWidth)
-            {
-                return length;
-            }
-
-            // Binary search to avoid O(n^2) measurement cost for long text.
-            int lo = 0;
-            int hi = length;
-            while (lo < hi)
-            {
-                int mid = lo + ((hi - lo) / 2);
-                double w = mid > 0 ? measure.Context.MeasureText(buffer[..mid], measure.Font).Width : 0;
-                if (w < x)
-                {
-                    lo = mid + 1;
-                }
-                else
-                {
-                    hi = mid;
-                }
-            }
-
-            int idx = Math.Clamp(lo, 0, length);
-
-            // Snap to the nearest caret position using midpoints for better feel.
-            if (idx <= 0)
-            {
-                return 0;
-            }
-
-            double w0 = measure.Context.MeasureText(buffer[..(idx - 1)], measure.Font).Width;
-            double w1 = measure.Context.MeasureText(buffer[..idx], measure.Font).Width;
-            return x < (w0 + w1) / 2 ? idx - 1 : idx;
-        }
-        finally
-        {
-            if (rented != null)
-            {
-                ArrayPool<char>.Shared.Return(rented);
-            }
-        }
+        return _view.GetCaretIndexFromX(
+            x,
+            measure.Context,
+            measure.Font,
+            fontFamily: FontFamily,
+            fontSize: FontSize,
+            fontWeight: FontWeight,
+            dpi: GetDpi(),
+            documentVersion: DocumentVersion,
+            textLength: Document.Length,
+            copyTextTo: (buffer, start, length) => Document.CopyTo(buffer, start, length));
     }
 
     private void EnsureCaretVisible(Rect contentBounds)
     {
         using var measure = BeginTextMeasurement();
-
-        var text = Text.AsSpan();
-
-        var caretX = CaretPosition > 0
-            ? measure.Context.MeasureText(text[..CaretPosition], measure.Font).Width
-            : 0;
-
-        if (caretX - HorizontalOffset > contentBounds.Width - 5)
-        {
-            SetHorizontalOffset(caretX - contentBounds.Width + 10, invalidateVisual: false);
-        }
-        else if (caretX - HorizontalOffset < 5)
-        {
-            SetHorizontalOffset(Math.Max(0, caretX - 10), invalidateVisual: false);
-        }
-
-        ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
-    }
-
-    private void ClampScrollOffset()
-    {
-        if (Document.IsEmpty)
-        {
-            SetHorizontalOffset(0, invalidateVisual: false);
-            return;
-        }
-
-        var contentBounds = GetInteractionContentBounds();
-        using var measure = BeginTextMeasurement();
-        ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
+        double newOffset = _view.EnsureCaretVisible(
+            measure.Context,
+            measure.Font,
+            fontFamily: FontFamily,
+            fontSize: FontSize,
+            fontWeight: FontWeight,
+            dpi: GetDpi(),
+            documentVersion: DocumentVersion,
+            textLength: Document.Length,
+            caretPosition: CaretPosition,
+            horizontalOffset: HorizontalOffset,
+            viewportWidthDip: contentBounds.Width,
+            endGutterDip: Padding.Right,
+            copyTextTo: (buffer, start, length) => Document.CopyTo(buffer, start, length));
+        SetHorizontalOffset(newOffset, invalidateVisual: false);
     }
 
     private void ClampScrollOffset(IGraphicsContext context, IFont font, double viewportWidthDip)
     {
-        if (Document.IsEmpty)
-        {
-            SetHorizontalOffset(0, invalidateVisual: false);
-            return;
-        }
+        double newOffset = _view.ClampScrollOffset(
+            context,
+            font,
+            fontFamily: FontFamily,
+            fontSize: FontSize,
+            fontWeight: FontWeight,
+            dpi: GetDpi(),
+            documentVersion: DocumentVersion,
+            textLength: Document.Length,
+            horizontalOffset: HorizontalOffset,
+            viewportWidthDip: viewportWidthDip,
+            endGutterDip: Padding.Right,
+            copyTextTo: (buffer, start, length) => Document.CopyTo(buffer, start, length));
+        SetHorizontalOffset(newOffset, invalidateVisual: false);
+    }
 
-        double textWidth = context.MeasureText(Text, font).Width;
-        double maxOffset = Math.Max(0, textWidth - Math.Max(0, viewportWidthDip));
-        SetHorizontalOffset(Math.Clamp(HorizontalOffset, 0, maxOffset), invalidateVisual: false);
+    private void ClampScrollOffset()
+    {
+        var contentBounds = GetInteractionContentBounds();
+        using var measure = BeginTextMeasurement();
+        ClampScrollOffset(measure.Context, measure.Font, contentBounds.Width);
     }
 
     // Key handling is centralized in TextBase.

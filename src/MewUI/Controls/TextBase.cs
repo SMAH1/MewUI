@@ -18,16 +18,8 @@ public abstract class TextBase : Control
     private int _documentVersion;
     private string? _cachedText;
     private int _cachedTextVersion = -1;
-
-    protected int _selectionStart;
-    protected int _selectionLength;
-
-    private readonly List<Edit> _undo = new();
-    private readonly List<Edit> _redo = new();
-    private bool _suppressUndoRecording;
-
-    private double _horizontalOffset;
-    private double _verticalOffset;
+    private readonly TextEditorCore _editor;
+    private readonly TextViewState _view = new();
 
     private bool _suppressTextInputNewline;
     private bool _suppressTextInputTab;
@@ -35,6 +27,17 @@ public abstract class TextBase : Control
     private protected TextDocument Document => _document;
 
     protected int DocumentVersion => _documentVersion;
+
+    protected TextBase()
+    {
+        _editor = new TextEditorCore(
+            getLength: GetTextLengthCore,
+            getChar: GetTextCharCore,
+            getSubstring: GetTextSubstringCore,
+            applyInsert: ApplyInsertForEdit,
+            applyRemove: ApplyRemoveForEdit,
+            onEditCommitted: OnEditCommitted);
+    }
 
     public string Text
     {
@@ -50,11 +53,8 @@ public abstract class TextBase : Control
 
             var old = current;
             SetTextCore(normalized);
-            ClearUndoRedo();
-
-            CaretPosition = Math.Min(CaretPosition, GetTextLengthCore());
-            _selectionStart = 0;
-            _selectionLength = 0;
+            _editor.ResetAfterTextSet();
+            InvalidateVisual();
 
             OnTextChanged(old, normalized);
             TextChanged?.Invoke(GetTextCore());
@@ -79,37 +79,34 @@ public abstract class TextBase : Control
 
     public int CaretPosition
     {
-        get;
-        set { field = Math.Clamp(value, 0, GetTextLengthCore()); InvalidateVisual(); }
+        get => _editor.CaretPosition;
+        set
+        {
+            int old = _editor.CaretPosition;
+            _editor.SetCaretPosition(value);
+            if (old != _editor.CaretPosition)
+            {
+                InvalidateVisual();
+            }
+        }
     }
 
     public event Action<string>? TextChanged;
     public event Action<bool>? WrapChanged;
 
-    public bool CanUndo => _undo.Count > 0;
+    public bool CanUndo => _editor.CanUndo;
 
-    public bool CanRedo => _redo.Count > 0;
+    public bool CanRedo => _editor.CanRedo;
 
     public override bool Focusable => true;
 
-    protected double HorizontalOffset => _horizontalOffset;
+    protected double HorizontalOffset => _view.HorizontalOffset;
 
-    protected double VerticalOffset => _verticalOffset;
+    protected double VerticalOffset => _view.VerticalOffset;
 
     protected void SetHorizontalOffset(double value, bool invalidateVisual = true)
     {
-        if (double.IsNaN(value) || double.IsInfinity(value))
-        {
-            value = 0;
-        }
-
-        if (_horizontalOffset == value)
-        {
-            return;
-        }
-
-        _horizontalOffset = value;
-        if (invalidateVisual)
+        if (_view.SetHorizontalOffset(value) && invalidateVisual)
         {
             InvalidateVisual();
         }
@@ -117,18 +114,7 @@ public abstract class TextBase : Control
 
     protected void SetVerticalOffset(double value, bool invalidateVisual = true)
     {
-        if (double.IsNaN(value) || double.IsInfinity(value))
-        {
-            value = 0;
-        }
-
-        if (_verticalOffset == value)
-        {
-            return;
-        }
-
-        _verticalOffset = value;
-        if (invalidateVisual)
+        if (_view.SetVerticalOffset(value) && invalidateVisual)
         {
             InvalidateVisual();
         }
@@ -136,9 +122,7 @@ public abstract class TextBase : Control
 
     protected void SetScrollOffsets(double horizontal, double vertical, bool invalidateVisual = true)
     {
-        SetHorizontalOffset(horizontal, invalidateVisual: false);
-        SetVerticalOffset(vertical, invalidateVisual: false);
-        if (invalidateVisual)
+        if (_view.SetScrollOffsets(horizontal, vertical) && invalidateVisual)
         {
             InvalidateVisual();
         }
@@ -164,18 +148,11 @@ public abstract class TextBase : Control
         return base.HitTest(point);
     }
 
-    protected bool HasSelection => _selectionLength != 0;
+    protected bool HasSelection => _editor.HasSelection;
 
     protected (int start, int end) GetSelectionRange()
     {
-        if (_selectionLength == 0)
-        {
-            return (CaretPosition, CaretPosition);
-        }
-
-        int a = _selectionStart;
-        int b = _selectionStart + _selectionLength;
-        return a <= b ? (a, b) : (b, a);
+        return _editor.GetSelectionRange();
     }
 
     protected virtual string NormalizeText(string text)
@@ -371,11 +348,11 @@ public abstract class TextBase : Control
                     {
                         if (e.ShiftKey)
                         {
-                            Redo();
+                            _editor.Redo();
                         }
                         else
                         {
-                            Undo();
+                            _editor.Undo();
                         }
 
                         EnsureCaretVisibleCore(GetInteractionContentBounds());
@@ -388,7 +365,7 @@ public abstract class TextBase : Control
                 case Key.Y:
                     if (!IsReadOnly)
                     {
-                        Redo();
+                        _editor.Redo();
                         EnsureCaretVisibleCore(GetInteractionContentBounds());
                         InvalidateVisual();
                     }
@@ -435,12 +412,12 @@ public abstract class TextBase : Control
             case Key.Home:
                 MoveCaretToLineEdge(start: true, extendSelection: e.ShiftKey);
                 e.Handled = true;
-                return;
+                break;
 
             case Key.End:
                 MoveCaretToLineEdge(start: false, extendSelection: e.ShiftKey);
                 e.Handled = true;
-                return;
+                break;
 
             case Key.Left:
                 MoveCaretHorizontalKey(-1, extendSelection: e.ShiftKey, word: e.ControlKey);
@@ -465,7 +442,7 @@ public abstract class TextBase : Control
             case Key.Backspace:
                 if (!IsReadOnly)
                 {
-                    BackspaceForEdit(e.ControlKey);
+                    _editor.BackspaceForEdit(e.ControlKey);
                 }
 
                 e.Handled = true;
@@ -474,7 +451,7 @@ public abstract class TextBase : Control
             case Key.Delete:
                 if (!IsReadOnly)
                 {
-                    DeleteForEdit(e.ControlKey);
+                    _editor.DeleteForEdit(e.ControlKey);
                 }
 
                 e.Handled = true;
@@ -483,7 +460,7 @@ public abstract class TextBase : Control
             case Key.Tab:
                 if (!IsReadOnly && AcceptTab)
                 {
-                    InsertTextAtCaretForEdit("\t");
+                    _editor.InsertTextAtCaretForEdit("\t");
                     _suppressTextInputTab = true;
                     e.Handled = true;
                 }
@@ -493,7 +470,7 @@ public abstract class TextBase : Control
             case Key.Enter:
                 if (!IsReadOnly && AcceptReturn)
                 {
-                    InsertTextAtCaretForEdit("\n");
+                    _editor.InsertTextAtCaretForEdit("\n");
                     _suppressTextInputNewline = true;
                     e.Handled = true;
                 }
@@ -564,8 +541,7 @@ public abstract class TextBase : Control
 
         var contentBounds = GetInteractionContentBounds();
         SetCaretFromPoint(e.Position, contentBounds);
-        _selectionStart = CaretPosition;
-        _selectionLength = 0;
+        _editor.BeginSelectionAtCaret();
 
         var root = FindVisualRoot();
         if (root is Window window)
@@ -590,8 +566,7 @@ public abstract class TextBase : Control
         var contentBounds = GetInteractionContentBounds();
         AutoScrollForSelectionDrag(e.Position, contentBounds);
         SetCaretFromPoint(e.Position, contentBounds);
-
-        _selectionLength = CaretPosition - _selectionStart;
+        _editor.UpdateSelectionToCaret();
         EnsureCaretVisibleCore(contentBounds);
         InvalidateVisual();
         e.Handled = true;
@@ -685,101 +660,22 @@ public abstract class TextBase : Control
 
     public void Undo()
     {
-        if (IsReadOnly || _undo.Count == 0)
+        if (IsReadOnly)
         {
             return;
         }
 
-        var edit = _undo[^1];
-        _undo.RemoveAt(_undo.Count - 1);
-
-        _suppressUndoRecording = true;
-        try
-        {
-            ApplyInverseEdit(edit);
-        }
-        finally
-        {
-            _suppressUndoRecording = false;
-        }
-
-        _redo.Add(edit);
+        _editor.Undo();
     }
 
     public void Redo()
     {
-        if (IsReadOnly || _redo.Count == 0)
+        if (IsReadOnly)
         {
             return;
         }
 
-        var edit = _redo[^1];
-        _redo.RemoveAt(_redo.Count - 1);
-
-        _suppressUndoRecording = true;
-        try
-        {
-            ApplyEdit(edit);
-        }
-        finally
-        {
-            _suppressUndoRecording = false;
-        }
-
-        _undo.Add(edit);
-    }
-
-    private void ApplyInverseEdit(Edit edit)
-    {
-        if (edit.Kind == EditKind.Insert)
-        {
-            ApplyRemoveForEdit(edit.Index, edit.Text.Length);
-            SetCaretAndSelection(edit.Index, extendSelection: false);
-        }
-        else
-        {
-            ApplyInsertForEdit(edit.Index, edit.Text);
-            SetCaretAndSelection(edit.Index + edit.Text.Length, extendSelection: false);
-        }
-
-        _selectionStart = CaretPosition;
-        _selectionLength = 0;
-        OnEditCommitted();
-    }
-
-    private void ApplyEdit(Edit edit)
-    {
-        if (edit.Kind == EditKind.Insert)
-        {
-            ApplyInsertForEdit(edit.Index, edit.Text);
-            SetCaretAndSelection(edit.Index + edit.Text.Length, extendSelection: false);
-        }
-        else
-        {
-            ApplyRemoveForEdit(edit.Index, edit.Text.Length);
-            SetCaretAndSelection(edit.Index, extendSelection: false);
-        }
-
-        _selectionStart = CaretPosition;
-        _selectionLength = 0;
-        OnEditCommitted();
-    }
-
-    private void ClearUndoRedo()
-    {
-        _undo.Clear();
-        _redo.Clear();
-    }
-
-    private void RecordEdit(Edit edit)
-    {
-        if (_suppressUndoRecording)
-        {
-            return;
-        }
-
-        _undo.Add(edit);
-        _redo.Clear();
+        _editor.Redo();
     }
 
     protected void BumpDocumentVersion()
@@ -845,9 +741,7 @@ public abstract class TextBase : Control
 
     protected virtual void SelectAllCore()
     {
-        _selectionStart = 0;
-        _selectionLength = GetTextLengthCore();
-        CaretPosition = GetTextLengthCore();
+        _editor.SelectAll();
         InvalidateVisual();
     }
 
@@ -865,7 +759,7 @@ public abstract class TextBase : Control
 
     protected virtual void CutToClipboardCore()
     {
-        if (_selectionLength == 0)
+        if (!HasSelection)
         {
             return;
         }
@@ -892,49 +786,17 @@ public abstract class TextBase : Control
 
     protected void SetCaretAndSelection(int newPos, bool extendSelection)
     {
-        if (!extendSelection)
-        {
-            CaretPosition = newPos;
-            _selectionStart = newPos;
-            _selectionLength = 0;
-            return;
-        }
-
-        if (_selectionLength == 0)
-        {
-            _selectionStart = CaretPosition;
-        }
-
-        CaretPosition = newPos;
-        _selectionLength = CaretPosition - _selectionStart;
+        _editor.SetCaretAndSelection(newPos, extendSelection);
     }
 
     protected void MoveCaretHorizontal(int direction, bool extendSelection, bool word)
     {
-        int length = GetTextLengthCore();
-        if (length == 0)
-        {
-            SetCaretAndSelection(0, extendSelection);
-            return;
-        }
-
-        int newPos;
-        if (word)
-        {
-            newPos = direction < 0 ? FindPreviousWordBoundary(CaretPosition) : FindNextWordBoundary(CaretPosition);
-        }
-        else
-        {
-            newPos = Math.Clamp(CaretPosition + direction, 0, length);
-        }
-
-        SetCaretAndSelection(newPos, extendSelection);
+        _editor.MoveCaretHorizontal(direction, extendSelection, word);
     }
 
     protected void MoveCaretToDocumentEdge(bool start, bool extendSelection)
     {
-        int newPos = start ? 0 : GetTextLengthCore();
-        SetCaretAndSelection(newPos, extendSelection);
+        _editor.MoveCaretToDocumentEdge(start, extendSelection);
     }
 
     protected virtual void MoveCaretToLineEdge(bool start, bool extendSelection)
@@ -942,120 +804,27 @@ public abstract class TextBase : Control
 
     protected void BackspaceForEdit(bool word)
     {
-        if (DeleteSelectionForEdit())
-        {
-            return;
-        }
-
-        if (CaretPosition <= 0)
-        {
-            return;
-        }
-
-        int deleteFrom = word ? FindPreviousWordBoundary(CaretPosition) : CaretPosition - 1;
-        int deleteLen = CaretPosition - deleteFrom;
-        if (deleteLen <= 0)
-        {
-            return;
-        }
-
-        string deleted = GetTextSubstringCore(deleteFrom, deleteLen);
-        ApplyRemoveForEdit(deleteFrom, deleteLen);
-        RecordEdit(new Edit(EditKind.Delete, deleteFrom, deleted));
-        SetCaretAndSelection(deleteFrom, extendSelection: false);
-        OnEditCommitted();
+        _editor.BackspaceForEdit(word);
     }
 
     protected void DeleteForEdit(bool word)
     {
-        if (DeleteSelectionForEdit())
-        {
-            return;
-        }
-
-        int length = GetTextLengthCore();
-        if (CaretPosition >= length)
-        {
-            return;
-        }
-
-        int deleteTo = word ? FindNextWordBoundary(CaretPosition) : CaretPosition + 1;
-        deleteTo = Math.Clamp(deleteTo, CaretPosition, length);
-
-        int deleteLen = deleteTo - CaretPosition;
-        if (deleteLen <= 0)
-        {
-            return;
-        }
-
-        string deleted = GetTextSubstringCore(CaretPosition, deleteLen);
-        ApplyRemoveForEdit(CaretPosition, deleteLen);
-        RecordEdit(new Edit(EditKind.Delete, CaretPosition, deleted));
-        SetCaretAndSelection(CaretPosition, extendSelection: false);
-        OnEditCommitted();
+        _editor.DeleteForEdit(word);
     }
 
     protected int FindPreviousWordBoundary(int from)
     {
-        if (from <= 0)
-        {
-            return 0;
-        }
-
-        int pos = Math.Min(from - 1, GetTextLengthCore() - 1);
-        while (pos > 0 && char.IsWhiteSpace(GetTextCharCore(pos)))
-        {
-            pos--;
-        }
-
-        while (pos > 0 && !char.IsWhiteSpace(GetTextCharCore(pos - 1)))
-        {
-            pos--;
-        }
-
-        return pos;
+        return _editor.FindPreviousWordBoundary(from);
     }
 
     protected int FindNextWordBoundary(int from)
     {
-        int length = GetTextLengthCore();
-        if (from >= length)
-        {
-            return length;
-        }
-
-        int pos = from;
-        while (pos < length && !char.IsWhiteSpace(GetTextCharCore(pos)))
-        {
-            pos++;
-        }
-
-        while (pos < length && char.IsWhiteSpace(GetTextCharCore(pos)))
-        {
-            pos++;
-        }
-
-        return pos;
+        return _editor.FindNextWordBoundary(from);
     }
 
     protected virtual bool DeleteSelectionForEdit()
     {
-        if (!HasSelection)
-        {
-            return false;
-        }
-
-        var (start, end) = GetSelectionRange();
-        int length = end - start;
-        string deleted = GetTextSubstringCore(start, length);
-
-        ApplyRemoveForEdit(start, length);
-        RecordEdit(new Edit(EditKind.Delete, start, deleted));
-        CaretPosition = start;
-        _selectionStart = start;
-        _selectionLength = 0;
-        OnEditCommitted();
-        return true;
+        return _editor.DeleteSelectionForEdit();
     }
 
     protected virtual void InsertTextAtCaretForEdit(string text)
@@ -1066,14 +835,7 @@ public abstract class TextBase : Control
             return;
         }
 
-        DeleteSelectionForEdit();
-
-        ApplyInsertForEdit(CaretPosition, text);
-        RecordEdit(new Edit(EditKind.Insert, CaretPosition, text));
-        CaretPosition += text.Length;
-        _selectionStart = CaretPosition;
-        _selectionLength = 0;
-        OnEditCommitted();
+        _editor.InsertTextAtCaretForEdit(text);
     }
 
     protected bool TryClipboardSetText(string text)
@@ -1156,7 +918,5 @@ public abstract class TextBase : Control
         return value;
     }
 
-    private enum EditKind { Insert, Delete }
-
-    private readonly record struct Edit(EditKind Kind, int Index, string Text);
+    protected void ClearUndoRedo() => _editor.ClearUndoRedo();
 }

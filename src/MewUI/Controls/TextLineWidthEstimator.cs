@@ -47,7 +47,13 @@ internal sealed class TextLineWidthEstimator
         return false;
     }
 
-    public double Compute(IGraphicsContext context, IFont font, int documentVersion, FontKey fontKey)
+    public double ComputeObservedMax(
+        IGraphicsContext context,
+        IFont font,
+        int documentVersion,
+        FontKey fontKey,
+        int firstLine,
+        int lastExclusive)
     {
         int lineCount = _getLineCount();
         if (lineCount <= 0 || _getTextLength() == 0)
@@ -56,11 +62,24 @@ internal sealed class TextLineWidthEstimator
             return 0;
         }
 
+        firstLine = Math.Clamp(firstLine, 0, lineCount);
+        lastExclusive = Math.Clamp(lastExclusive, firstLine, lineCount);
+
+        if (_cachedVersion != documentVersion || _cachedFontKey != fontKey)
+        {
+            Cache(documentVersion, fontKey, 0);
+        }
+
+        if (firstLine >= lastExclusive)
+        {
+            return _cachedWidth;
+        }
+
         const int StackAllocThreshold = 512;
         Span<char> smallBuffer = stackalloc char[StackAllocThreshold];
 
-        double max = 0;
-        for (int i = 0; i < lineCount; i++)
+        double max = _cachedWidth;
+        for (int i = firstLine; i < lastExclusive; i++)
         {
             _getLineSpan(i, out int start, out int end);
             if (end <= start)
@@ -92,6 +111,19 @@ internal sealed class TextLineWidthEstimator
         return max;
     }
 
+    public double Compute(IGraphicsContext context, IFont font, int documentVersion, FontKey fontKey)
+    {
+        int lineCount = _getLineCount();
+        if (lineCount <= 0 || _getTextLength() == 0)
+        {
+            Cache(documentVersion, fontKey, 0);
+            return 0;
+        }
+
+        Cache(documentVersion, fontKey, 0);
+        return ComputeObservedMax(context, font, documentVersion, fontKey, firstLine: 0, lastExclusive: lineCount);
+    }
+
     private void Cache(int documentVersion, FontKey fontKey, double width)
     {
         _cachedVersion = documentVersion;
@@ -99,4 +131,3 @@ internal sealed class TextLineWidthEstimator
         _cachedWidth = width;
     }
 }
-
