@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/build/">
+    <File Path="build/MewUI.Common.props" />
+  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/MewUI.Sample/MewUI.Sample.csproj" />
   </Folder>

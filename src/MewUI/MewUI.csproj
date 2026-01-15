@@ -1,26 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  <Import Project="$(SolutionDir)build\MewUI.Common.props" />
 
+  <PropertyGroup>
     <!-- Assembly Info -->
-    <RootNamespace>Aprillz.MewUI</RootNamespace>
-    <AssemblyName>Aprillz.MewUI</AssemblyName>
-    <Version>0.6.2</Version>
-    <Authors>Aprillz</Authors>
-    <Description>A cross-platform and lightweight, code-first .NET GUI library aimed at NativeAOT</Description>
+    <AssemblyName>$(MewUITitle)</AssemblyName>
+    <Description>$(MewUIDescription)</Description>
 
     <!-- NuGet -->
-    <PackageId>Aprillz.MewUI</PackageId>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageId>$(MewUITitle)</PackageId>
     <PackageReadmeFile>NUGET_README.md</PackageReadmeFile>
     <PackageIcon>logo_c-256.png</PackageIcon>
-    <PublishRepositoryUrl>false</PublishRepositoryUrl>
-    <IncludeSymbols>false</IncludeSymbols>
   </PropertyGroup>
 
   <ItemGroup>
