@@ -1,3 +1,5 @@
+using System;
+
 using Aprillz.MewUI.Rendering;
 
 namespace Aprillz.MewUI;
@@ -138,6 +140,106 @@ public abstract class Element
         }
         return current;
     }
+
+    public bool IsAncestorOf(Element descendant)
+    {
+        ArgumentNullException.ThrowIfNull(descendant);
+
+        return descendant.IsDescendantOf(this);
+    }
+
+    public bool IsDescendantOf(Element ancestor)
+    {
+        ArgumentNullException.ThrowIfNull(ancestor);
+
+        for (var current = Parent; current != null; current = current.Parent)
+        {
+            if (current == ancestor)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns a transform from this element's coordinate space to the specified ancestor's coordinate space.
+    /// </summary>
+    public GeneralTransform TransformToAncestor(Element ancestor)
+    {
+        ArgumentNullException.ThrowIfNull(ancestor);
+
+        if (ancestor == this)
+        {
+            return IdentityGeneralTransform.Instance;
+        }
+
+        if (!IsDescendantOf(ancestor))
+        {
+            throw new InvalidOperationException("The specified element is not an ancestor of this element.");
+        }
+
+        double dx = Bounds.X - ancestor.Bounds.X;
+        double dy = Bounds.Y - ancestor.Bounds.Y;
+        return new TranslateGeneralTransform(dx, dy);
+    }
+
+    /// <summary>
+    /// Returns a transform from this element's coordinate space to the specified descendant's coordinate space.
+    /// </summary>
+    public GeneralTransform TransformToDescendant(Element descendant)
+    {
+        ArgumentNullException.ThrowIfNull(descendant);
+
+        if (descendant == this)
+        {
+            return IdentityGeneralTransform.Instance;
+        }
+
+        if (!descendant.IsDescendantOf(this))
+        {
+            throw new InvalidOperationException("The specified element is not a descendant of this element.");
+        }
+
+        return descendant.TransformToAncestor(this).Inverse;
+    }
+
+    /// <summary>
+    /// Returns a transform from this element's coordinate space to the specified visual's coordinate space.
+    /// Both elements must be in the same visual tree.
+    /// </summary>
+    public GeneralTransform TransformToVisual(Element visual)
+    {
+        ArgumentNullException.ThrowIfNull(visual);
+
+        if (visual == this)
+        {
+            return IdentityGeneralTransform.Instance;
+        }
+
+        var root = FindVisualRoot();
+        if (root == null || root != visual.FindVisualRoot())
+        {
+            throw new InvalidOperationException("The specified element is not in the same visual tree.");
+        }
+
+        double dx = Bounds.X - visual.Bounds.X;
+        double dy = Bounds.Y - visual.Bounds.Y;
+        return new TranslateGeneralTransform(dx, dy);
+    }
+
+    /// <summary>
+    /// Converts a point in this element's coordinate space to the specified element's coordinate space.
+    /// </summary>
+    public Point TranslatePoint(Point point, Element relativeTo)
+        => TransformToVisual(relativeTo).Transform(point);
+
+    /// <summary>
+    /// Converts a rectangle in this element's coordinate space to the specified element's coordinate space.
+    /// </summary>
+    public Rect TranslateRect(Rect rect, Element relativeTo)
+        => TransformToVisual(relativeTo).TransformBounds(rect);
 
     /// <summary>
     /// Allows an element to adjust its final arranged bounds (e.g. alignment, margin, rounding).

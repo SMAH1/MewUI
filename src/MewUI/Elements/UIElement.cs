@@ -233,6 +233,44 @@ public abstract class UIElement : Element
 
     internal void SetMouseCaptured(bool captured) => IsMouseCaptured = captured;
 
+    public Point PointToScreen(Point point)
+    {
+        var root = FindVisualRoot();
+        if (root is not Window window || window.Handle == 0)
+        {
+            throw new InvalidOperationException("The visual is not connected to a window.");
+        }
+
+        var inWindow = TranslatePoint(point, window);
+        return window.ClientToScreen(inWindow);
+    }
+
+    public Point PointFromScreen(Point point)
+    {
+        var root = FindVisualRoot();
+        if (root is not Window window || window.Handle == 0)
+        {
+            throw new InvalidOperationException("The visual is not connected to a window.");
+        }
+
+        var inWindow = window.ScreenToClient(point);
+        return window.TranslatePoint(inWindow, this);
+    }
+
+    public Rect RectToScreen(Rect rect)
+    {
+        var tl = PointToScreen(rect.TopLeft);
+        var br = PointToScreen(rect.BottomRight);
+        return new Rect(tl.X, tl.Y, br.X - tl.X, br.Y - tl.Y);
+    }
+
+    public Rect RectFromScreen(Rect rect)
+    {
+        var tl = PointFromScreen(rect.TopLeft);
+        var br = PointFromScreen(rect.BottomRight);
+        return new Rect(tl.X, tl.Y, br.X - tl.X, br.Y - tl.Y);
+    }
+
     internal void ReevaluateSuggestedIsEnabled()
     {
         bool old = _suggestedIsEnabledInitialized ? _suggestedIsEnabled : true;
