@@ -99,7 +99,8 @@ public abstract class TextBase : Control
 
     protected void SetHorizontalOffset(double value, bool invalidateVisual = true)
     {
-        if (_view.SetHorizontalOffset(value) && invalidateVisual)
+        var dpiScale = GetDpi() / 96.0;
+        if (_view.SetHorizontalOffset(value, dpiScale) && invalidateVisual)
         {
             InvalidateVisual();
         }
@@ -107,7 +108,8 @@ public abstract class TextBase : Control
 
     protected void SetVerticalOffset(double value, bool invalidateVisual = true)
     {
-        if (_view.SetVerticalOffset(value) && invalidateVisual)
+        var dpiScale = GetDpi() / 96.0;
+        if (_view.SetVerticalOffset(value, dpiScale) && invalidateVisual)
         {
             InvalidateVisual();
         }
@@ -115,7 +117,8 @@ public abstract class TextBase : Control
 
     protected void SetScrollOffsets(double horizontal, double vertical, bool invalidateVisual = true)
     {
-        if (_view.SetScrollOffsets(horizontal, vertical) && invalidateVisual)
+        var dpiScale = GetDpi() / 96.0;
+        if (_view.SetScrollOffsets(horizontal, vertical, dpiScale) && invalidateVisual)
         {
             InvalidateVisual();
         }
@@ -217,7 +220,8 @@ public abstract class TextBase : Control
     protected Rect GetViewportContentBounds()
     {
         var viewportBounds = GetViewportInnerBounds();
-        return viewportBounds.Deflate(Padding);
+        var dpiScale = GetDpi() / 96.0;
+        return LayoutRounding.SnapRectEdgesToPixels(viewportBounds.Deflate(Padding), dpiScale);
     }
 
     protected abstract void RenderTextContent(IGraphicsContext context, Rect contentBounds, IFont font, Theme theme, in VisualState state);
@@ -245,7 +249,14 @@ public abstract class TextBase : Control
         var contentBounds = GetViewportContentBounds();
 
         context.Save();
-        context.SetClip(contentBounds);
+        // Expand the clip by 1 device pixel on right/bottom so 1px strokes/glyph overhang at the edge
+        // don't get clipped under an ancestor clip.
+        var dpiScale = GetDpi() / 96.0;
+        double onePx = 1.0 / dpiScale;
+        var clip = LayoutRounding.SnapRectEdgesToPixelsOutward(
+            new Rect(contentBounds.X, contentBounds.Y, contentBounds.Width + onePx, contentBounds.Height + onePx),
+            dpiScale);
+        context.SetClip(clip);
 
         var font = GetFont();
 
@@ -909,6 +920,19 @@ public abstract class TextBase : Control
         }
 
         return value;
+    }
+
+    protected static double ClampOffset(double value, double extent, double viewport, double dpiScale)
+    {
+        double clamped = ClampOffset(value, extent, viewport);
+
+        if (dpiScale <= 0 || double.IsNaN(dpiScale) || double.IsInfinity(dpiScale))
+        {
+            return clamped;
+        }
+
+        clamped = LayoutRounding.RoundToPixel(clamped, dpiScale);
+        return ClampOffset(clamped, extent, viewport);
     }
 
     protected void ClearUndoRedo() => _editor.ClearUndoRedo();

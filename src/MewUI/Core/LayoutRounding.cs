@@ -63,6 +63,34 @@ public static class LayoutRounding
         return new Rect(x, y, w, h);
     }
 
+    public static Rect SnapRectEdgesToPixelsOutward(Rect rect, double dpiScale)
+    {
+        if (dpiScale <= 0 || double.IsNaN(dpiScale) || double.IsInfinity(dpiScale))
+        {
+            return rect;
+        }
+
+        if (rect.IsEmpty)
+        {
+            return rect;
+        }
+
+        int leftPx = (int)Math.Floor(rect.X * dpiScale);
+        int topPx = (int)Math.Floor(rect.Y * dpiScale);
+        int rightPx = (int)Math.Ceiling((rect.X + rect.Width) * dpiScale);
+        int bottomPx = (int)Math.Ceiling((rect.Y + rect.Height) * dpiScale);
+
+        int widthPx = Math.Max(0, rightPx - leftPx);
+        int heightPx = Math.Max(0, bottomPx - topPx);
+
+        double x = leftPx / dpiScale;
+        double y = topPx / dpiScale;
+        double w = widthPx / dpiScale;
+        double h = heightPx / dpiScale;
+
+        return new Rect(x, y, w, h);
+    }
+
     public static Rect RoundRectToPixels(Rect rect, double dpiScale)
     {
         if (dpiScale <= 0 || double.IsNaN(dpiScale) || double.IsInfinity(dpiScale))
