@@ -6,7 +6,7 @@ namespace Aprillz.MewUI.Platform.Linux;
 internal sealed class LinuxUiDispatcher : SynchronizationContext, IUiDispatcher
 {
     private readonly int _uiThreadId = Environment.CurrentManagedThreadId;
-    private readonly ConcurrentQueue<Action> _queue = new();
+    private readonly UiDispatcherQueue _queue = new();
     private readonly object _timersGate = new();
     private readonly List<ScheduledTimer> _timers = new();
     private long _nextTimerId;
@@ -15,12 +15,21 @@ internal sealed class LinuxUiDispatcher : SynchronizationContext, IUiDispatcher
 
     public void Post(Action action)
     {
-        if (action == null)
+        if (action != null)
         {
-            return;
+            Post(action, UiDispatcherPriority.Background);
         }
+    }
 
-        _queue.Enqueue(action);
+    public void Post(Action action, UiDispatcherPriority priority)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        _queue.Enqueue(priority, action);
+    }
+
+    public bool PostMerged(DispatcherMergeKey mergeKey, Action action, UiDispatcherPriority priority)
+    {
+        return _queue.EnqueueMerged(priority, mergeKey, action);
     }
 
     public void Send(Action action)
@@ -38,12 +47,12 @@ internal sealed class LinuxUiDispatcher : SynchronizationContext, IUiDispatcher
 
         using var gate = new ManualResetEventSlim(false);
         Exception? error = null;
-        _queue.Enqueue(() =>
+        Post(() =>
         {
             try { action(); }
             catch (Exception ex) { error = ex; }
             finally { gate.Set(); }
-        });
+        }, UiDispatcherPriority.Input);
 
         gate.Wait();
         if (error != null)
@@ -79,10 +88,7 @@ internal sealed class LinuxUiDispatcher : SynchronizationContext, IUiDispatcher
 
     public void ProcessWorkItems()
     {
-        while (_queue.TryDequeue(out var action))
-        {
-            action();
-        }
+        _queue.Process();
 
         ProcessTimers();
     }
