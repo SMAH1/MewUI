@@ -21,4 +21,9 @@
     <None Include="..\..\assets\images\april.jpg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\icon\appicon.ico" LogicalName="Aprillz.MewUI.Sample.appicon.ico" />
+  </ItemGroup>
+
 </Project>

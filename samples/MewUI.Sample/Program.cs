@@ -25,6 +25,7 @@ var april = ImageSource.FromFile("april.jpg");
 
 var root = new Window()
     .Ref(out window)
+    .Padding(0)
     .Title("Aprillz.MewUI Demo")
     .Resizable(744, 720)
     .OnLoaded(() =>
@@ -36,31 +37,38 @@ var root = new Window()
     .Content(
         new DockPanel()
             .LastChildFill()
-            .Spacing(16)
             .Children(
-                TopSection().DockTop(),
+                MenuDemo().DockTop(),
 
-                Buttons().DockBottom(),
+                new DockPanel()
+                    .LastChildFill()
+                    .Padding(16)
+                    .Spacing(16)
+                    .Children(
+                        TopSection().DockTop(),
 
-                new TabControl()
-                    .VerticalScroll(ScrollMode.Auto)
-                    .TabItems(
-                        new TabItem()
-                            .Header("Controls")
-                            .Content(
-                                NormalControls()
-                            ),
+                        Buttons().DockBottom(),
 
-                        new TabItem()
-                            .Header("Binding")
-                            .Content(
-                                BindSamples()
-                            ),
+                        new TabControl()
+                            .VerticalScroll(ScrollMode.Auto)
+                            .TabItems(
+                                new TabItem()
+                                    .Header("Controls")
+                                    .Content(
+                                        NormalControls()
+                                    ),
 
-                        new TabItem()
-                            .Header("Commanding")
-                            .Content(
-                                CommandingSamples()
+                                new TabItem()
+                                    .Header("Binding")
+                                    .Content(
+                                        BindSamples()
+                                    ),
+
+                                new TabItem()
+                                    .Header("Commanding")
+                                    .Content(
+                                        CommandingSamples()
+                                    )
                             )
                     )
             )
@@ -71,6 +79,10 @@ var root = new Window()
         metricsTimer.Start();
     });
 
+using (var rs = typeof(Program).Assembly.GetManifestResourceStream("Aprillz.MewUI.Sample.appicon.ico")!)
+{
+    root.Icon = IconSource.FromStream(rs);
+}
 Application.Run(root);
 
 Element HeaderSection() => new StackPanel()
@@ -95,6 +107,50 @@ Element TopSection() => new StackPanel()
         ThemeControls(),
         AccentPicker()
     );
+
+Element MenuDemo()
+{
+    var fileMenu = new Menu()
+        .Item("New", () => MessageBox.Show(window.Handle, "New", "Menu"))
+        .Item("Open...", () => MessageBox.Show(window.Handle, "Open", "Menu"))
+        .Separator()
+        .Item("Exit", () => Application.Quit());
+
+    var deepMenu = new Menu()
+        .Item("Deep A", () => MessageBox.Show(window.Handle, "Deep A", "Menu"))
+        .Item("Deep B", () => MessageBox.Show(window.Handle, "Deep B", "Menu"));
+
+    var recentMenu = new Menu()
+        .Item("a.txt", () => MessageBox.Show(window.Handle, "a.txt", "Recent"))
+        .Item("b.txt", () => MessageBox.Show(window.Handle, "b.txt", "Recent"))
+        .Separator()
+        .SubMenu("More...", deepMenu);
+
+    var editMenu = new Menu()
+        .SubMenu("Recent", recentMenu)
+        .Separator()
+        .Item("Copy", () => { }, shortcutText: "Ctrl+C")
+        .Item("Paste", () => { }, shortcutText: "Ctrl+V");
+
+    var helpAboutMenu = new Menu()
+        .Item("About", () => MessageBox.Show(window.Handle, "Aprillz.MewUI", "About"));
+
+    var helpDocsMenu = new Menu()
+        .Item("Docs", () => MessageBox.Show(window.Handle, "docs/", "Help"))
+        .Item("Korean Docs", () => MessageBox.Show(window.Handle, "ko/docs/", "Help"));
+
+    var helpMenu = new Menu()
+        .SubMenu("Documentation", helpDocsMenu)
+        .Separator()
+        .SubMenu("About", helpAboutMenu);
+
+    return new MenuBar()
+        .Items(
+            new MenuItem("File").Menu(fileMenu),
+            new MenuItem("Edit").Menu(editMenu),
+            new MenuItem("Help").Menu(helpMenu)
+        );
+}
 
 Element ThemeControls() => new StackPanel()
     .Horizontal()
@@ -174,10 +230,46 @@ Element NormalControls()
 {
     MultiLineTextBox notesTextBox = null!;
     CheckBox wrapCheck = null!;
+    var demoMenu = new ContextMenu();
+    var nestedMenu = new ContextMenu()
+        .Item("Option 1", () => MessageBox.Show(window.Handle, "Option 1", "Nested ContextMenu"))
+        .Item("Option 2", () => MessageBox.Show(window.Handle, "Option 2", "Nested ContextMenu"));
+
+    var deepMenu = new ContextMenu()
+        .Item("Deep A", () => MessageBox.Show(window.Handle, "Deep A", "Nested ContextMenu"))
+        .Item("Deep B", () => MessageBox.Show(window.Handle, "Deep B", "Nested ContextMenu"));
+
+    nestedMenu.SubMenu("More...", deepMenu);
+
+    demoMenu
+        .Item("Item 1")
+        .Item("Item 2")
+        .Separator()
+        .Item("Say hello", () => MessageBox.Show(window.Handle, "Hello from ContextMenu!", "ContextMenu"))
+        .Separator()
+        .SubMenu("Nested", nestedMenu)
+        .Separator()
+        .Item("Disabled item", () => { }, isEnabled: false);
 
     return new StackPanel()
         .Spacing(16)
         .Children(
+            new GroupBox()
+                .Header("ToolTip / ContextMenu")
+                .Content(
+                    new StackPanel()
+                        .Vertical()
+                        .Spacing(8)
+                        .Children(
+                            new Label()
+                                .Text("Hover to show a tooltip. Right-click to open a context menu."),
+
+                            new Button()
+                                .Content("Hover / Right-click me")
+                                .ToolTip("ToolTip: shown via Window internal popup overlay.")
+                                .ContextMenu(demoMenu)
+                        )),
+
             new Grid()
                 .Columns("Auto,*,Auto,2*")
                 .Spacing(8)
