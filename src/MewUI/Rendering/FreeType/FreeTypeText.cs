@@ -133,7 +133,9 @@ internal static unsafe class FreeTypeText
 
             lock (face.SyncRoot)
             {
-                int flags = FreeTypeLoad.FT_LOAD_DEFAULT | FreeTypeLoad.FT_LOAD_FORCE_AUTOHINT;
+                // Prefer LIGHT target for crisper UI text on typical Linux setups.
+                // Avoid FORCE_AUTOHINT by default; it can make some fonts look blurrier/thicker than expected.
+                int flags = FreeTypeLoad.FT_LOAD_DEFAULT | FreeTypeLoad.FT_LOAD_TARGET_LIGHT;
                 if (FT.FT_Load_Char(face.Face, code, flags) != 0)
                 {
                     goto Advance;

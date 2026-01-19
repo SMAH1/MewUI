@@ -74,7 +74,9 @@ internal sealed unsafe class FreeTypeFaceCache
                         return 0;
                     }
 
-                    int err = FT.FT_Get_Advance(Face, gindex, FreeTypeLoad.FT_LOAD_DEFAULT, out nint advFixed);
+                    // Prefer LIGHT target for crisper UI text on typical Linux setups.
+                    int flags = FreeTypeLoad.FT_LOAD_DEFAULT | FreeTypeLoad.FT_LOAD_TARGET_LIGHT;
+                    int err = FT.FT_Get_Advance(Face, gindex, flags, out nint advFixed);
                     if (err != 0)
                     {
                         return 0;
