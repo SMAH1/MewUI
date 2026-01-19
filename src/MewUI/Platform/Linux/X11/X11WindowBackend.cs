@@ -743,6 +743,23 @@ internal sealed class X11WindowBackend : IWindowBackend
     private static Key MapKeysymToKey(long keysym)
     {
         // Minimal mapping for navigation/editing.
+        // KeySyms for ASCII letters/numbers are their Unicode code points
+        // (e.g. 'A' == 0x41, 'a' == 0x61, '0' == 0x30).
+        if (keysym is >= 0x41 and <= 0x5A)
+        {
+            return (Key)((int)Key.A + (int)(keysym - 0x41));
+        }
+
+        if (keysym is >= 0x61 and <= 0x7A)
+        {
+            return (Key)((int)Key.A + (int)(keysym - 0x61));
+        }
+
+        if (keysym is >= 0x30 and <= 0x39)
+        {
+            return (Key)((int)Key.D0 + (int)(keysym - 0x30));
+        }
+
         return keysym switch
         {
             0xFF08 => Key.Backspace,

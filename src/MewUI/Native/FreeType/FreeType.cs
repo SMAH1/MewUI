@@ -48,6 +48,10 @@ internal static class FreeTypeLoad
     public const int FT_LOAD_DEFAULT = 0x0;
     public const int FT_LOAD_RENDER = 0x4;
     public const int FT_LOAD_TARGET_NORMAL = 0x0;
+    // FT_LOAD_TARGET_XXX flags are (FT_Render_Mode_XXX << 16).
+    // See FreeType: FT_LOAD_TARGET( x ) macro.
+    public const int FT_LOAD_TARGET_LIGHT = 0x1 << 16;
+    public const int FT_LOAD_TARGET_LCD = 0x3 << 16;
     public const int FT_LOAD_FORCE_AUTOHINT = 0x20;
 }
 
@@ -59,6 +63,8 @@ internal static class FreeTypeKerning
 internal static class FreeTypeRenderMode
 {
     public const uint FT_RENDER_MODE_NORMAL = 0;
+    public const uint FT_RENDER_MODE_LIGHT = 1;
+    public const uint FT_RENDER_MODE_LCD = 3;
 }
 
 [StructLayout(LayoutKind.Sequential)]
