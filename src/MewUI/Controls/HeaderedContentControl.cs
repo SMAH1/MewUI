@@ -100,7 +100,7 @@ public class HeaderedContentControl : ContentControl
         Header?.Render(context);
     }
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
         if (!IsVisible || !IsHitTestVisible)
         {
@@ -116,7 +116,7 @@ public class HeaderedContentControl : ContentControl
             }
         }
 
-        return base.HitTest(point);
+        return base.OnHitTest(point);
     }
 
     void IVisualTreeHost.VisitChildren(Action<Element> visitor)

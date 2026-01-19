@@ -15,6 +15,8 @@ public abstract class Control : FrameworkElement, IDisposable
     private string? _fontFamily;
     private double? _fontSize;
     private FontWeight? _fontWeight;
+    private ToolTip? _toolTipPopup;
+    private Point _lastMousePositionInWindow;
 
     protected virtual Color DefaultBackground => Color.Transparent;
     protected virtual Color DefaultForeground => Theme.Current.Palette.WindowText;
@@ -22,6 +24,18 @@ public abstract class Control : FrameworkElement, IDisposable
     protected virtual string DefaultFontFamily => Theme.Current.FontFamily;
     protected virtual double DefaultFontSize => Theme.Current.FontSize;
     protected virtual FontWeight DefaultFontWeight => Theme.Current.FontWeight;
+
+    public string? ToolTipText
+    {
+        get;
+        set;
+    }
+
+    public ContextMenu? ContextMenu
+    {
+        get;
+        set;
+    }
 
     protected readonly struct TextMeasurementScope : IDisposable
     {
@@ -443,6 +457,126 @@ public abstract class Control : FrameworkElement, IDisposable
             0);
     }
 
+    protected override void OnMouseEnter()
+    {
+        base.OnMouseEnter();
+        ShowToolTip();
+    }
+
+    protected override void OnMouseLeave()
+    {
+        base.OnMouseLeave();
+        HideToolTip();
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        _lastMousePositionInWindow = e.Position;
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+
+        HideToolTip();
+
+        if (e.Handled)
+        {
+            return;
+        }
+
+        if (e.Button == MouseButton.Right && ContextMenu != null)
+        {
+            ContextMenu.ShowAt(this, e.Position);
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Handled)
+        {
+            return;
+        }
+
+        // Hide tooltips on keyboard interaction.
+        HideToolTip();
+    }
+
+    private void ShowToolTip()
+    {
+        if (!IsMouseOver)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ToolTipText))
+        {
+            return;
+        }
+
+        var root = FindVisualRoot();
+        if (root is not Window window)
+        {
+            return;
+        }
+
+        _toolTipPopup ??= new ToolTip();
+        _toolTipPopup.Text = ToolTipText!;
+
+        var client = window.ClientSizeDip;
+        var anchor = _lastMousePositionInWindow;
+        if (anchor.X == 0 && anchor.Y == 0 && Bounds.Width > 0 && Bounds.Height > 0)
+        {
+            anchor = new Point(Bounds.X + Bounds.Width / 2, Bounds.Bottom);
+        }
+
+        const double dx = 12;
+        const double dy = 18;
+        double x = anchor.X + dx;
+        double y = anchor.Y + dy;
+
+        _toolTipPopup.Measure(new Size(Math.Max(0, client.Width), Math.Max(0, client.Height)));
+        var desired = _toolTipPopup.DesiredSize;
+        double w = Math.Max(0, desired.Width);
+        double h = Math.Max(0, desired.Height);
+
+        if (x + w > client.Width)
+        {
+            x = Math.Max(0, client.Width - w);
+        }
+
+        if (y + h > client.Height)
+        {
+            y = Math.Max(0, anchor.Y - h - dy);
+            if (y < 0)
+            {
+                y = Math.Max(0, client.Height - h);
+            }
+        }
+
+        window.ShowPopup(this, _toolTipPopup, new Rect(x, y, w, h));
+    }
+
+    private void HideToolTip()
+    {
+        if (_toolTipPopup == null)
+        {
+            return;
+        }
+
+        var root = FindVisualRoot();
+        if (root is not Window window)
+        {
+            return;
+        }
+
+        window.ClosePopup(_toolTipPopup);
+    }
+
     protected virtual void OnDispose() { }
 
     public void Dispose()
@@ -460,6 +594,13 @@ public abstract class Control : FrameworkElement, IDisposable
         // Release cached font resources.
         _font?.Dispose();
         _font = null;
+
+        if (_toolTipPopup != null)
+        {
+            HideToolTip();
+            _toolTipPopup.Dispose();
+            _toolTipPopup = null;
+        }
 
         OnDispose();
     }

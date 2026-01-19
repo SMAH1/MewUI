@@ -9,6 +9,7 @@ public sealed class GroupBox : HeaderedContentControl
 {
     protected override Color DefaultBackground => Theme.Current.Palette.ContainerBackground;
     protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
+    protected override bool InvalidateOnMouseOverChanged => false;
 
     public double HeaderInset
     {

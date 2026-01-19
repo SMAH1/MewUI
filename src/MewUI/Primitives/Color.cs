@@ -63,6 +63,8 @@ public readonly struct Color : IEquatable<Color>
     }
 
     public Color WithAlpha(byte alpha) => new(alpha, R, G, B);
+	
+    public Color WithAlpha(double alpha) => new((byte)(alpha * 255), R, G, B);
 
     public Color Lerp(Color other, double t)
     {

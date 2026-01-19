@@ -146,7 +146,9 @@ public abstract class UIElement : Element
     /// <summary>
     /// Performs hit testing to find the element at the specified point.
     /// </summary>
-    public virtual UIElement? HitTest(Point point)
+    public UIElement? HitTest(Point point) => OnHitTest(point);
+
+    protected virtual UIElement? OnHitTest(Point point)
     {
         if (!IsVisible || !IsHitTestVisible || !IsEffectivelyEnabled)
         {
@@ -227,9 +229,19 @@ public abstract class UIElement : Element
                 OnMouseLeave();
                 MouseLeave?.Invoke();
             }
-            InvalidateVisual();
+            if (InvalidateOnMouseOverChanged)
+            {
+                InvalidateVisual();
+            }
         }
     }
+
+    /// <summary>
+    /// Controls whether <see cref="SetMouseOver"/> triggers an <see cref="InvalidateVisual"/>.
+    /// Container elements like panels can opt out to avoid redundant redraw on hover changes
+    /// when they don't have any hover-dependent visuals.
+    /// </summary>
+    protected virtual bool InvalidateOnMouseOverChanged => true;
 
     internal void SetMouseCaptured(bool captured) => IsMouseCaptured = captured;
 

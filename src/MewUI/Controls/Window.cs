@@ -5,6 +5,7 @@ using Aprillz.MewUI.Input;
 using Aprillz.MewUI.Platform;
 using Aprillz.MewUI.Resources;
 using Aprillz.MewUI.Rendering;
+using System.Diagnostics;
 
 namespace Aprillz.MewUI;
 
@@ -39,7 +40,7 @@ public class Window : ContentControl
     {
         public required UIElement Element { get; init; }
 
-        public required UIElement Owner { get; init; }
+        public required UIElement Owner { get; set; }
 
         public Rect Bounds { get; set; }
     }
@@ -357,6 +358,10 @@ public class Window : ContentControl
         {
             return;
         }
+
+#if DEV_DEBUG
+        Debug.WriteLine("PerformLayout");
+#endif
 
         const int maxPasses = 8;
         var contentSize = clientSize.Deflate(padding);
@@ -708,14 +713,6 @@ public class Window : ContentControl
             }
         }
 
-        for (int i = _popups.Count - 1; i >= 0; i--)
-        {
-            if (_popups[i].Owner.Bounds.Contains(position))
-            {
-                return;
-            }
-        }
-
         CloseAllPopups();
     }
 
@@ -744,12 +741,18 @@ public class Window : ContentControl
         {
             if (_popups[i].Element == popup)
             {
+                _popups[i].Owner = owner;
                 UpdatePopup(popup, bounds);
                 return;
             }
         }
 
+        // Popups can be cached/reused (e.g. ComboBox keeps a ListBox instance even while closed).
+        // If a popup is moved between windows (or the window DPI differs), ensure the popup updates its DPI-sensitive
+        // caches (fonts, layout) before measuring/arranging.
+        uint oldDpi = popup.GetDpiCached();
         popup.Parent = this;
+        ApplyPopupDpiChange(popup, oldDpi, Dpi);
         var entry = new PopupEntry { Owner = owner, Element = popup, Bounds = bounds };
         _popups.Add(entry);
         LayoutPopup(entry);
@@ -804,7 +807,27 @@ public class Window : ContentControl
         entry.Bounds = entry.Element.Bounds;
     }
 
-    public override UIElement? HitTest(Point point)
+    private static void ApplyPopupDpiChange(UIElement popup, uint oldDpi, uint newDpi)
+    {
+        if (oldDpi == 0 || newDpi == 0 || oldDpi == newDpi)
+        {
+            return;
+        }
+
+        // Clear DPI caches again (Parent assignment already does this, but be defensive for future changes),
+        // and notify controls so they can recreate DPI-dependent resources (fonts, etc.).
+        popup.ClearDpiCacheDeep();
+        VisitVisualTree(popup, e =>
+        {
+            e.ClearDpiCache();
+            if (e is Control c)
+            {
+                c.NotifyDpiChanged(oldDpi, newDpi);
+            }
+        });
+    }
+
+    protected override UIElement? OnHitTest(Point point)
     {
         for (int i = _popups.Count - 1; i >= 0; i--)
         {

@@ -308,9 +308,9 @@ public sealed class TabControl : Control
         _contentHost.Render(context);
     }
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
-        if (!IsVisible || !IsHitTestVisible)
+        if (!IsVisible || !IsHitTestVisible || !IsEffectivelyEnabled)
         {
             return null;
         }
@@ -500,7 +500,13 @@ public sealed class TabControl : Control
 
     private bool HasFocusWithin() => IsFocusWithin;
 
-    internal Color GetOutlineColor(Theme theme) => HasFocusWithin() ? theme.Palette.Accent : theme.Palette.ControlBorder;
+    internal Color GetOutlineColor(Theme theme)
+    {
+        var baseBorder = BorderBrush;
+        return HasFocusWithin()
+            ? baseBorder.Lerp(theme.Palette.Accent, 0.5)
+            : baseBorder;
+    }
 
     internal Color GetTabStripBackground(Theme theme) => theme.Palette.ButtonFace;
 

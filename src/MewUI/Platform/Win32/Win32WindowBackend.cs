@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 using Aprillz.MewUI.Controls;
@@ -428,6 +429,9 @@ internal sealed class Win32WindowBackend : IWindowBackend
 
     private nint HandlePaint()
     {
+#if DEV_DEBUG
+        Debug.WriteLine("HandlePaint");
+#endif
         var ps = new PAINTSTRUCT();
         nint hdc = User32.BeginPaint(Handle, out ps);
 
@@ -524,7 +528,10 @@ internal sealed class Win32WindowBackend : IWindowBackend
         var pos = GetMousePosition(lParam);
         var screenPos = ClientToScreen(pos);
 
-        Window.ClosePopupsIfClickOutside(pos);
+        if (isDown)
+        {
+            Window.ClosePopupsIfClickOutside(pos);
+        }
 
         var element = _capturedElement ?? Window.HitTest(pos);
 

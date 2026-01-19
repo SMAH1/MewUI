@@ -1,0 +1,623 @@
+using Aprillz.MewUI.Rendering;
+
+namespace Aprillz.MewUI.Controls;
+
+public sealed class ContextMenu : Control, IPopupOwner
+{
+    private const double SubMenuGlyphAreaWidth = 14;
+    private const double ShortcutColumnGap = 12;
+
+    private readonly Menu _menu;
+    private int _hotIndex = -1;
+    private ContextMenu? _openSubMenu;
+    private int _openSubMenuIndex = -1;
+    private ContextMenu? _parentMenu;
+    private double _maxTextWidth;
+    private double _maxShortcutWidth;
+    private bool _hasAnyShortcut;
+
+    public Menu Menu => _menu;
+
+    public IList<MenuEntry> Items => _menu.Items;
+
+    public double ItemHeight
+    {
+        get;
+        set { field = value; InvalidateMeasure(); InvalidateVisual(); }
+    } = double.NaN;
+
+    public Thickness ItemPadding
+    {
+        get;
+        set { field = value; InvalidateMeasure(); InvalidateVisual(); }
+    } = Theme.Current.ListItemPadding;
+
+    public double MaxMenuHeight
+    {
+        get;
+        set { field = value; InvalidateMeasure(); }
+    } = 320;
+
+    public override bool Focusable => true;
+
+    public ContextMenu()
+        : this(new Menu())
+    {
+    }
+
+    public ContextMenu(Menu menu)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        _menu = menu;
+        if (!double.IsNaN(menu.ItemHeight) && menu.ItemHeight > 0)
+        {
+            ItemHeight = menu.ItemHeight;
+        }
+        if (menu.ItemPadding is Thickness itemPadding)
+        {
+            ItemPadding = itemPadding;
+        }
+        BorderThickness = 1;
+        Padding = new Thickness(1);
+    }
+
+    protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
+
+    protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
+
+    public void AddItem(string text, Action? onClick = null, bool isEnabled = true, string? shortcutText = null)
+    {
+        _menu.Item(text, onClick, isEnabled, shortcutText);
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    public void AddSubMenu(string text, Menu subMenu, bool isEnabled = true, string? shortcutText = null)
+    {
+        ArgumentNullException.ThrowIfNull(subMenu);
+        _menu.SubMenu(text, subMenu, isEnabled, shortcutText);
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    public void AddEntry(MenuEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        _menu.Add(entry);
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    public void SetItems(params MenuEntry[] items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        Items.Clear();
+        for (int i = 0; i < items.Length; i++)
+        {
+            AddEntry(items[i]);
+        }
+    }
+
+    public void AddSeparator()
+    {
+        _menu.Separator();
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    internal void ShowAt(UIElement owner, Point positionInWindow)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+
+        var root = owner.FindVisualRoot();
+        if (root is not Window window)
+        {
+            return;
+        }
+
+        CloseDescendants(window);
+        _parentMenu = null;
+
+        // Measure without passing infinity into backends that may convert widths to ints.
+        var client = window.ClientSizeDip;
+        Measure(new Size(Math.Max(0, client.Width), Math.Max(0, client.Height)));
+        var desired = DesiredSize;
+
+        double width = Math.Max(0, desired.Width);
+        double height = Math.Max(0, desired.Height);
+
+        double maxH = Math.Max(0, MaxMenuHeight);
+        if (maxH > 0)
+        {
+            height = Math.Min(height, maxH);
+        }
+
+        double x = positionInWindow.X;
+        double y = positionInWindow.Y;
+
+        if (x + width > client.Width)
+        {
+            x = Math.Max(0, client.Width - width);
+        }
+
+        if (y + height > client.Height)
+        {
+            y = Math.Max(0, client.Height - height);
+        }
+
+        window.ShowPopup(owner, this, new Rect(x, y, width, height));
+        window.FocusManager.SetFocus(this);
+    }
+
+    private double ResolveItemHeight()
+    {
+        if (!double.IsNaN(ItemHeight) && ItemHeight > 0)
+        {
+            return ItemHeight;
+        }
+
+        var theme = GetTheme();
+        return Math.Max(18, theme.BaseControlHeight - 2);
+    }
+
+    protected override void OnThemeChanged(Theme oldTheme, Theme newTheme)
+    {
+        base.OnThemeChanged(oldTheme, newTheme);
+
+        if (ItemPadding == oldTheme.ListItemPadding)
+        {
+            ItemPadding = newTheme.ListItemPadding;
+        }
+    }
+
+    private double GetEntryHeight(MenuEntry entry)
+    {
+        if (entry is MenuSeparator)
+        {
+            return MenuSeparator.MenuSeparatorHeight;
+        }
+
+        return ResolveItemHeight();
+    }
+
+    protected override Size MeasureContent(Size availableSize)
+    {
+        var borderInset = GetBorderVisualInset();
+
+        double height = 0;
+        double itemHeight = ResolveItemHeight();
+
+        using var measure = BeginTextMeasurement();
+
+        _maxTextWidth = 0;
+        _maxShortcutWidth = 0;
+        _hasAnyShortcut = false;
+        bool hasAnySubMenu = false;
+
+        foreach (var entry in Items)
+        {
+            if (entry is MenuSeparator)
+            {
+                height += MenuSeparator.MenuSeparatorHeight;
+                continue;
+            }
+
+            if (entry is MenuItem item)
+            {
+                var text = item.Text ?? string.Empty;
+                var size = string.IsNullOrEmpty(text) ? Size.Empty : measure.Context.MeasureText(text, measure.Font);
+                _maxTextWidth = Math.Max(_maxTextWidth, size.Width);
+
+                var shortcutText = item.ShortcutText;
+                if (!string.IsNullOrEmpty(shortcutText))
+                {
+                    _hasAnyShortcut = true;
+                    var shortcutSize = measure.Context.MeasureText(shortcutText, measure.Font);
+                    _maxShortcutWidth = Math.Max(_maxShortcutWidth, shortcutSize.Width);
+                }
+
+                hasAnySubMenu |= item.SubMenu != null;
+
+                height += itemHeight;
+            }
+        }
+
+        double maxWidth = _maxTextWidth + ItemPadding.HorizontalThickness;
+
+        if (_hasAnyShortcut)
+        {
+            maxWidth += ShortcutColumnGap + _maxShortcutWidth;
+        }
+
+        if (hasAnySubMenu)
+        {
+            maxWidth += SubMenuGlyphAreaWidth;
+        }
+
+        double contentW = maxWidth + Padding.HorizontalThickness;
+        double contentH = height + Padding.VerticalThickness;
+
+        // Cap height (scrolling can come later).
+        double maxH = Math.Max(0, MaxMenuHeight);
+        if (maxH > 0)
+        {
+            contentH = Math.Min(contentH, maxH);
+        }
+
+        return new Size(contentW, contentH).Inflate(new Thickness(borderInset));
+    }
+
+    protected override void OnMouseLeave()
+    {
+        base.OnMouseLeave();
+        if (_hotIndex != -1)
+        {
+            _hotIndex = -1;
+            InvalidateVisual();
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (e.Handled)
+        {
+            return;
+        }
+
+        int index = HitTestEntryIndex(e.Position);
+        if (_hotIndex != index)
+        {
+            _hotIndex = index;
+            InvalidateVisual();
+        }
+
+        if (index >= 0 && index < Items.Count && Items[index] is MenuItem item && item.SubMenu != null && item.IsEnabled)
+        {
+            if (_openSubMenuIndex != index)
+            {
+                if (TryGetEntryRowBounds(index, out var rowBounds))
+                {
+                    OpenSubMenu(index, item.SubMenu, rowBounds);
+                }
+            }
+        }
+        else
+        {
+            // If the user hovers a non-submenu item inside this menu, close the currently open submenu.
+            if (index != -1)
+            {
+                CloseSubMenu();
+            }
+        }
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+
+        if (!IsEnabled || e.Handled || e.Button != MouseButton.Left)
+        {
+            return;
+        }
+
+        int index = HitTestEntryIndex(e.Position);
+        if (index < 0 || index >= Items.Count)
+        {
+            return;
+        }
+
+        if (Items[index] is MenuItem item && item.IsEnabled)
+        {
+            if (item.SubMenu != null)
+            {
+                if (TryGetEntryRowBounds(index, out var rowBounds))
+                {
+                    OpenSubMenu(index, item.SubMenu, rowBounds);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
+            item.Click?.Invoke();
+
+            var root = FindVisualRoot();
+            if (root is Window window)
+            {
+                CloseHierarchy(window);
+            }
+
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (e.Handled)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            var root = FindVisualRoot();
+            if (root is Window window)
+            {
+                // Close only this menu; parent menus remain open.
+                CloseSubMenu();
+                window.ClosePopup(this);
+                e.Handled = true;
+            }
+        }
+    }
+
+    void IPopupOwner.OnPopupClosed(UIElement popup)
+    {
+        if (_openSubMenu != null && popup == _openSubMenu)
+        {
+            _openSubMenu = null;
+            _openSubMenuIndex = -1;
+        }
+    }
+
+    private void OpenSubMenu(int index, Menu subMenu, Rect ownerRowBounds)
+    {
+        var root = FindVisualRoot();
+        if (root is not Window window)
+        {
+            return;
+        }
+
+        CloseSubMenu();
+
+        var subMenuPopup = new ContextMenu(subMenu)
+        {
+            ItemHeight = ItemHeight,
+            MaxMenuHeight = MaxMenuHeight,
+            Foreground = Foreground,
+            ItemPadding = ItemPadding,
+        };
+        if (!double.IsNaN(subMenu.ItemHeight) && subMenu.ItemHeight > 0)
+        {
+            subMenuPopup.ItemHeight = subMenu.ItemHeight;
+        }
+        if (subMenu.ItemPadding is Thickness subPadding)
+        {
+            subMenuPopup.ItemPadding = subPadding;
+        }
+        subMenuPopup._parentMenu = this;
+
+        var client = window.ClientSizeDip;
+        subMenuPopup.Measure(new Size(Math.Max(0, client.Width), Math.Max(0, client.Height)));
+        var desired = subMenuPopup.DesiredSize;
+
+        double width = Math.Max(0, desired.Width);
+        double height = Math.Max(0, desired.Height);
+        double maxH = Math.Max(0, subMenuPopup.MaxMenuHeight);
+        if (maxH > 0)
+        {
+            height = Math.Min(height, maxH);
+        }
+
+        // Place to the right of the row (WPF-like), clamped to window client.
+        const double horizontalOffset = 2;
+        const double verticalOffset = -2;
+        double x = ownerRowBounds.Right + horizontalOffset;
+        double y = ownerRowBounds.Y + verticalOffset;
+
+        if (x + width > client.Width)
+        {
+            x = Math.Max(0, ownerRowBounds.X - horizontalOffset - width);
+        }
+
+        if (y + height > client.Height)
+        {
+            y = Math.Max(0, client.Height - height);
+        }
+
+        window.ShowPopup(this, subMenuPopup, new Rect(x, y, width, height));
+        _openSubMenu = subMenuPopup;
+        _openSubMenuIndex = index;
+    }
+
+    private void CloseSubMenu()
+    {
+        if (_openSubMenu == null)
+        {
+            return;
+        }
+
+        var root = FindVisualRoot();
+        if (root is Window window)
+        {
+            _openSubMenu.CloseDescendants(window);
+            window.ClosePopup(_openSubMenu);
+        }
+
+        _openSubMenu = null;
+        _openSubMenuIndex = -1;
+    }
+
+    private void CloseDescendants(Window window)
+    {
+        if (_openSubMenu == null)
+        {
+            return;
+        }
+
+        _openSubMenu.CloseDescendants(window);
+        window.ClosePopup(_openSubMenu);
+        _openSubMenu = null;
+        _openSubMenuIndex = -1;
+    }
+
+    internal void CloseTree(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        CloseDescendants(window);
+        window.ClosePopup(this);
+    }
+
+    private void CloseHierarchy(Window window)
+    {
+        for (ContextMenu? current = this; current != null; current = current._parentMenu)
+        {
+            current.CloseDescendants(window);
+            window.ClosePopup(current);
+        }
+    }
+
+    private int HitTestEntryIndex(Point position)
+    {
+        var bounds = GetSnappedBorderBounds(Bounds);
+        var borderInset = GetBorderVisualInset();
+        var innerBounds = bounds.Deflate(new Thickness(borderInset));
+        var contentBounds = innerBounds.Deflate(Padding);
+
+        if (!contentBounds.Contains(position))
+        {
+            return -1;
+        }
+
+        double y = position.Y - contentBounds.Y;
+        double acc = 0;
+        for (int i = 0; i < Items.Count; i++)
+        {
+            double h = GetEntryHeight(Items[i]);
+            if (y >= acc && y < acc + h)
+            {
+                return i;
+            }
+            acc += h;
+        }
+
+        return -1;
+    }
+
+    private bool TryGetEntryRowBounds(int index, out Rect rowBounds)
+    {
+        rowBounds = Rect.Empty;
+
+        if (index < 0 || index >= Items.Count)
+        {
+            return false;
+        }
+
+        var bounds = GetSnappedBorderBounds(Bounds);
+        var borderInset = GetBorderVisualInset();
+        var innerBounds = bounds.Deflate(new Thickness(borderInset));
+        var contentBounds = innerBounds.Deflate(Padding);
+
+        double y = contentBounds.Y;
+        for (int i = 0; i < Items.Count; i++)
+        {
+            double h = GetEntryHeight(Items[i]);
+            if (i == index)
+            {
+                rowBounds = new Rect(contentBounds.X, y, contentBounds.Width, h);
+                return true;
+            }
+
+            y += h;
+        }
+
+        return false;
+    }
+
+    protected override void OnRender(IGraphicsContext context)
+    {
+        var theme = GetTheme();
+        var bounds = GetSnappedBorderBounds(Bounds);
+        double radius = theme.ControlCornerRadius;
+        var borderInset = GetBorderVisualInset();
+        double itemRadius = Math.Max(0, radius - borderInset);
+
+        DrawBackgroundAndBorder(context, bounds, Background, BorderBrush, radius);
+
+        var innerBounds = bounds.Deflate(new Thickness(borderInset));
+        var contentBounds = innerBounds.Deflate(Padding);
+        if (contentBounds.Width <= 0 || contentBounds.Height <= 0)
+        {
+            return;
+        }
+
+        using var measure = BeginTextMeasurement();
+        var font = measure.Font;
+
+        double y = contentBounds.Y;
+        for (int i = 0; i < Items.Count; i++)
+        {
+            var entry = Items[i];
+            double h = GetEntryHeight(entry);
+            var row = new Rect(contentBounds.X, y, contentBounds.Width, h);
+
+            if (entry is MenuSeparator)
+            {
+                var sepY = row.Y + (row.Height - 1) / 2;
+                context.DrawLine(new Point(row.X + 4, sepY), new Point(row.Right - 4, sepY), theme.Palette.ControlBorder, 1);
+                y += h;
+                continue;
+            }
+
+            if (entry is MenuItem item)
+            {
+                bool isHot = i == _hotIndex;
+                var bg = isHot ? theme.Palette.SelectionBackground.WithAlpha(0.6) : Color.Transparent;
+                if (bg.A > 0)
+                {
+                    if (itemRadius > 0)
+                    {
+                        context.FillRoundedRectangle(row, itemRadius, itemRadius, bg);
+                    }
+                    else
+                    {
+                        context.FillRectangle(row, bg);
+                    }
+                }
+
+                var fg = item.IsEnabled ? Foreground : theme.Palette.DisabledText;
+                var chevronReserved = item.SubMenu != null ? SubMenuGlyphAreaWidth : 0;
+
+                var paddedRow = row.Deflate(ItemPadding);
+
+                double textLeft = paddedRow.X;
+                double textRight = paddedRow.Right - chevronReserved;
+                if (_hasAnyShortcut)
+                {
+                    textRight -= (_maxShortcutWidth + ShortcutColumnGap);
+                }
+
+                var textRect = new Rect(textLeft, paddedRow.Y, Math.Max(0, textRight - textLeft), paddedRow.Height);
+                context.DrawText(item.Text ?? string.Empty, textRect, font, fg,
+                    TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
+
+                if (_hasAnyShortcut && !string.IsNullOrEmpty(item.ShortcutText))
+                {
+                    double shortcutRight = paddedRow.Right - chevronReserved;
+                    double shortcutLeft = shortcutRight - _maxShortcutWidth;
+                    var shortcutRect = new Rect(shortcutLeft, paddedRow.Y, Math.Max(0, shortcutRight - shortcutLeft), paddedRow.Height);
+                    context.DrawText(item.ShortcutText, shortcutRect, font, fg,
+                        TextAlignment.Right, TextAlignment.Center, TextWrapping.NoWrap);
+                }
+
+                if (item.SubMenu != null)
+                {
+                    // Simple submenu chevron indicator.
+                    var cx = paddedRow.Right;
+                    var cy = paddedRow.Y + paddedRow.Height / 2;
+                    context.DrawLine(new Point(cx - 1.5, cy - 3), new Point(cx + 1.5, cy), fg, 1);
+                    context.DrawLine(new Point(cx + 1.5, cy), new Point(cx - 1.5, cy + 3), fg, 1);
+                }
+            }
+
+            y += h;
+            if (y > contentBounds.Bottom)
+            {
+                break;
+            }
+        }
+    }
+}

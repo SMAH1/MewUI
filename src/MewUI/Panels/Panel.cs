@@ -10,6 +10,8 @@ public abstract class Panel : Control
 {
     private readonly List<Element> _children = new();
 
+    protected override bool InvalidateOnMouseOverChanged => false;
+
     /// <summary>
     /// Gets the collection of child elements.
     /// </summary>
@@ -123,9 +125,9 @@ public abstract class Panel : Control
         }
     }
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
-        if (!IsVisible || !IsHitTestVisible)
+        if (!IsVisible || !IsHitTestVisible || !IsEffectivelyEnabled)
         {
             return null;
         }

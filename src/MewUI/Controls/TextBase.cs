@@ -17,6 +17,8 @@ public abstract class TextBase : Control
     private bool _suppressTextInputNewline;
     private bool _suppressTextInputTab;
 
+    private ContextMenu? _defaultContextMenu;
+
     private protected TextDocument Document => _document;
 
     protected int DocumentVersion => _documentVersion;
@@ -30,6 +32,41 @@ public abstract class TextBase : Control
             ApplyInsertForEdit,
             ApplyRemoveForEdit,
             OnEditCommitted);
+    }
+
+    public void Copy()
+    {
+        CopyToClipboardCore();
+    }
+
+    public void Cut()
+    {
+        if (IsReadOnly)
+        {
+            return;
+        }
+
+        CutToClipboardCore();
+        EnsureCaretVisibleCore(GetInteractionContentBounds());
+        InvalidateVisual();
+    }
+
+    public void Paste()
+    {
+        if (IsReadOnly)
+        {
+            return;
+        }
+
+        PasteFromClipboardCore();
+        EnsureCaretVisibleCore(GetInteractionContentBounds());
+        InvalidateVisual();
+    }
+
+    public void SelectAll()
+    {
+        SelectAllCore();
+        InvalidateVisual();
     }
 
     public string Text
@@ -128,7 +165,7 @@ public abstract class TextBase : Control
 
     protected virtual UIElement? HitTestOverride(Point point) => null;
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
         if (!IsVisible || !IsHitTestVisible)
         {
@@ -141,7 +178,7 @@ public abstract class TextBase : Control
             return hit;
         }
 
-        return base.HitTest(point);
+        return base.OnHitTest(point);
     }
 
     protected bool HasSelection => _editor.HasSelection;
@@ -530,7 +567,30 @@ public abstract class TextBase : Control
     {
         base.OnMouseDown(e);
 
-        if (!IsEnabled || e.Button != MouseButton.Left)
+        if (e.Handled)
+        {
+            return;
+        }
+
+        if (!IsEnabled)
+        {
+            return;
+        }
+
+        if (e.Button == MouseButton.Right)
+        {
+            // If the user assigned a custom context menu, let Control handle it.
+            if (ContextMenu != null)
+            {
+                return;
+            }
+
+            ShowDefaultTextContextMenu(e.Position);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Button != MouseButton.Left)
         {
             return;
         }
@@ -550,6 +610,29 @@ public abstract class TextBase : Control
         EnsureCaretVisibleCore(contentBounds);
         InvalidateVisual();
         e.Handled = true;
+    }
+
+    private void ShowDefaultTextContextMenu(Point positionInWindow)
+    {
+        var menu = _defaultContextMenu ??= new ContextMenu();
+        menu.Items.Clear();
+
+        bool canPaste = false;
+        if (!IsReadOnly && TryClipboardGetText(out var clip) && !string.IsNullOrEmpty(clip))
+        {
+            canPaste = true;
+        }
+
+        menu.AddItem("Undo", () => Undo(), isEnabled: !IsReadOnly && CanUndo, shortcutText: "Ctrl+Z");
+        menu.AddItem("Redo", () => Redo(), isEnabled: !IsReadOnly && CanRedo, shortcutText: "Ctrl+Y");
+        menu.AddSeparator();
+        menu.AddItem("Cut", () => Cut(), isEnabled: !IsReadOnly && HasSelection, shortcutText: "Ctrl+X");
+        menu.AddItem("Copy", () => Copy(), isEnabled: HasSelection, shortcutText: "Ctrl+C");
+        menu.AddItem("Paste", () => Paste(), isEnabled: canPaste, shortcutText: "Ctrl+V");
+        menu.AddSeparator();
+        menu.AddItem("Select All", () => SelectAll(), isEnabled: GetTextLengthCore() > 0, shortcutText: "Ctrl+A");
+
+        menu.ShowAt(this, positionInWindow);
     }
 
     protected override void OnMouseMove(MouseEventArgs e)

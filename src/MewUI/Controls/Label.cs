@@ -8,6 +8,7 @@ namespace Aprillz.MewUI.Controls;
 public class Label : Control
 {
     private ValueBinding<string>? _textBinding;
+    protected override bool InvalidateOnMouseOverChanged => false;
 
     /// <summary>
     /// Gets or sets the text content.

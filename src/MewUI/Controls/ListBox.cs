@@ -354,7 +354,7 @@ public class ListBox : Control
         }
     }
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
         if (!IsVisible || !IsHitTestVisible || !IsEnabled)
         {
@@ -366,7 +366,7 @@ public class ListBox : Control
             return _vBar;
         }
 
-        return base.HitTest(point);
+        return base.OnHitTest(point);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)

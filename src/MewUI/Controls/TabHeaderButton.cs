@@ -25,9 +25,11 @@ internal sealed class TabHeaderButton : ContentControl
     // Keyboard navigation is handled by TabControl itself (arrows / Ctrl+PgUp/PgDn).
     public override bool Focusable => false;
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
-        if (!IsVisible || !IsHitTestVisible)
+        // Match WPF semantics: disabled tabs should not participate in hit testing,
+        // otherwise they keep receiving hover/mouse-over changes and triggering redraw.
+        if (!IsVisible || !IsHitTestVisible || !IsEffectivelyEnabled || !IsTabEnabled)
         {
             return null;
         }

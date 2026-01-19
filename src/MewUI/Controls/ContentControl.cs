@@ -67,7 +67,7 @@ public class ContentControl : Control
         Content?.Render(context);
     }
 
-    public override UIElement? HitTest(Point point)
+    protected override UIElement? OnHitTest(Point point)
     {
         if (!IsVisible || !IsHitTestVisible)
         {

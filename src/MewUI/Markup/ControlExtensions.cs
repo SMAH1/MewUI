@@ -58,6 +58,18 @@ public static class ControlExtensions
         return control;
     }
 
+    public static T ToolTip<T>(this T control, string? text) where T : Control
+    {
+        control.ToolTipText = text;
+        return control;
+    }
+
+    public static T ContextMenu<T>(this T control, ContextMenu? menu) where T : Control
+    {
+        control.ContextMenu = menu;
+        return control;
+    }
+
     #endregion
 
     #region UIElement Events (Generic)
@@ -459,6 +471,78 @@ public static class ControlExtensions
             h => source.Changed += h,
             h => source.Changed -= h);
         return listBox;
+    }
+
+    #endregion
+
+    #region ContextMenu
+
+    public static ContextMenu Items(this ContextMenu menu, params MenuEntry[] items)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+
+        menu.SetItems(items);
+
+        return menu;
+    }
+
+    public static ContextMenu Item(this ContextMenu menu, string text, Action? onClick = null, bool isEnabled = true)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        menu.AddItem(text, onClick, isEnabled);
+        return menu;
+    }
+
+    public static ContextMenu Item(this ContextMenu menu, string text, string shortcutText, Action? onClick = null, bool isEnabled = true)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        menu.AddItem(text, onClick, isEnabled, shortcutText);
+        return menu;
+    }
+
+    public static ContextMenu SubMenu(this ContextMenu menu, string text, ContextMenu subMenu, bool isEnabled = true)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        ArgumentNullException.ThrowIfNull(subMenu);
+
+        menu.AddSubMenu(text, subMenu.Menu, isEnabled);
+        return menu;
+    }
+
+    public static ContextMenu SubMenu(this ContextMenu menu, string text, string shortcutText, ContextMenu subMenu, bool isEnabled = true)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        ArgumentNullException.ThrowIfNull(subMenu);
+
+        menu.AddSubMenu(text, subMenu.Menu, isEnabled, shortcutText);
+        return menu;
+    }
+
+    public static ContextMenu Separator(this ContextMenu menu)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        menu.AddSeparator();
+        return menu;
+    }
+
+    public static ContextMenu ItemHeight(this ContextMenu menu, double itemHeight)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        menu.ItemHeight = itemHeight;
+        return menu;
+    }
+
+    public static ContextMenu ItemPadding(this ContextMenu menu, Thickness itemPadding)
+    {
+        ArgumentNullException.ThrowIfNull(menu);
+        menu.ItemPadding = itemPadding;
+        return menu;
+    }
+
+    public static ContextMenu MaxMenuHeight(this ContextMenu menu, double height)
+    {
+        menu.MaxMenuHeight = height;
+        return menu;
     }
 
     #endregion
