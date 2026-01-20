@@ -1,31 +1,74 @@
-using Aprillz.MewUI.Rendering;
-
 namespace Aprillz.MewUI;
 
 public record class Theme
 {
-    public static Theme Light { get; } = CreateLight();
-    public static Theme Dark { get; } = CreateDark();
+    private static readonly BuiltInAccentPair[] _builtInAccents =
+    [
+        new BuiltInAccentPair(Color.FromRgb(51, 122, 255),  Color.FromRgb(62, 141, 255)),  // Blue
+        new BuiltInAccentPair(Color.FromRgb(143, 84, 219),  Color.FromRgb(158, 101, 232)), // Purple
+        new BuiltInAccentPair(Color.FromRgb(236, 90, 161),  Color.FromRgb(244, 112, 174)), // Pink
+        new BuiltInAccentPair(Color.FromRgb(236, 92, 86),   Color.FromRgb(244, 110, 104)), // Red
+        new BuiltInAccentPair(Color.FromRgb(240, 140, 56),  Color.FromRgb(248, 156, 74)),  // Orange
+        new BuiltInAccentPair(Color.FromRgb(245, 204, 67),  Color.FromRgb(250, 214, 90)),  // Yellow
+        new BuiltInAccentPair(Color.FromRgb(132, 192, 79),  Color.FromRgb(150, 204, 98)),  // Green
+        new BuiltInAccentPair(Color.FromRgb(150, 150, 150), Color.FromRgb(165, 165, 165)), // Gray
+    ];
+
+    public static Accent DefaultAccent { get; } = Accent.Blue;
+
+    public static Theme Light => field ??= CreateLight();
+
+    public static Theme Dark => field ??= CreateDark();
+
+    private readonly struct BuiltInAccentPair
+    {
+        public Color Light { get; }
+
+        public Color Dark { get; }
+
+        public BuiltInAccentPair(Color light, Color dark)
+        {
+            Light = light;
+            Dark = dark;
+        }
+    }
+
+    public static IReadOnlyList<Accent> BuiltInAccents { get; } = Enum.GetValues<Accent>();
+
+    public Color GetAccentColor(Accent accent) => GetAccentColor(accent, Palette.IsDarkBackground(Palette.WindowBackground));
+
+    public static Color GetAccentColor(Accent accent, bool isDark)
+    {
+        int idx = (int)accent;
+        if ((uint)idx >= (uint)_builtInAccents.Length)
+        {
+            idx = (int)Accent.Gray;
+        }
+
+        var pair = _builtInAccents[idx];
+        return isDark ? pair.Dark : pair.Light;
+    }
+
+    public Theme WithAccent(Accent accent, Color? accentText = null)
+        => WithAccent(GetAccentColor(accent), accentText);
 
     public static Theme Current
     {
-        get => _current;
+        get => field ?? Light;
         set
         {
             ArgumentNullException.ThrowIfNull(value);
 
-            if (_current == value)
+            if (field == value)
             {
                 return;
             }
 
-            var old = _current;
-            _current = value;
+            var old = Current;
+            field = value;
             CurrentChanged?.Invoke(old, value);
         }
     }
-
-    private static Theme _current = Light;
 
     public static Action<Theme, Theme>? CurrentChanged { get; set; }
 
@@ -40,15 +83,22 @@ public record class Theme
     public Thickness ListItemPadding { get; init; }
 
     public string FontFamily { get; init; }
+
     public double FontSize { get; init; }
+
     public FontWeight FontWeight { get; init; }
 
     // Scroll (thin style defaults)
     public double ScrollBarThickness { get; init; }
+
     public double ScrollBarHitThickness { get; init; }
+
     public double ScrollBarMinThumbLength { get; init; }
+
     public double ScrollWheelStep { get; init; }
+
     public double ScrollBarSmallChange { get; init; }
+
     public double ScrollBarLargeChange { get; init; }
 
     public Theme WithAccent(Color accent, Color? accentText = null)
@@ -112,15 +162,16 @@ public record class Theme
 
     private static Theme CreateLight()
     {
+        var accent = DefaultAccent;
         var palette = new Palette(
             name: "Light",
             baseColors: new ThemeSeed(
-                WindowBackground: Color.FromRgb(244, 244, 244),
+                WindowBackground: Color.FromRgb(250, 250, 250),
                 WindowText: Color.FromRgb(30, 30, 30),
                 ControlBackground: Color.White,
                 ButtonFace: Color.FromRgb(232, 232, 232),
                 ButtonDisabledBackground: Color.FromRgb(204, 204, 204)),
-            accent: Color.FromRgb(214, 176, 82));
+            accent: GetAccentColor(accent, isDark: false));
 
         return new Theme(
             name: "Light",
@@ -141,15 +192,16 @@ public record class Theme
 
     private static Theme CreateDark()
     {
+        var accent = DefaultAccent;
         var palette = new Palette(
             name: "Dark",
             baseColors: new ThemeSeed(
-                WindowBackground: Color.FromRgb(28, 28, 28),
+                WindowBackground: Color.FromRgb(30, 30, 30),
                 WindowText: Color.FromRgb(230, 230, 232),
                 ControlBackground: Color.FromRgb(26, 26, 27),
                 ButtonFace: Color.FromRgb(48, 48, 50),
                 ButtonDisabledBackground: Color.FromRgb(60, 60, 64)),
-            accent: Color.FromRgb(214, 165, 94));
+            accent: GetAccentColor(accent, isDark: true));
 
         return new Theme(
             name: "Dark",
@@ -167,4 +219,16 @@ public record class Theme
             scrollBarSmallChange: 24,
             scrollBarLargeChange: 120);
     }
+}
+
+public enum Accent
+{
+    Blue,
+    Purple,
+    Pink,
+    Red,
+    Orange,
+    Yellow,
+    Green,
+    Gray,
 }

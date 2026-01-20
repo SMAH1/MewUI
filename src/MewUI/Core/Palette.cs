@@ -69,7 +69,7 @@ public sealed class Palette
         ButtonFace = buttonFace;
         ButtonDisabledBackground = buttonDisabledBackground;
 
-        ContainerBackground = ComputeContainerBackground(windowBackground, buttonFace);
+        ContainerBackground = ComputeContainerBackground(windowBackground, buttonFace, accent);
 
         Accent = accent;
         AccentText = accentText ?? GetDefaultAccentText(accent);
@@ -102,14 +102,14 @@ public sealed class Palette
     private static Color ComputeControlBorder(Color windowBackground, Color windowText, Color accent)
     {
         var isDark = IsDarkBackground(windowBackground);
-        var baseBorder = windowBackground.Lerp(windowText, isDark ? 0.18 : 0.21);
+        var baseBorder = windowBackground.Lerp(windowText, isDark ? 0.15 : 0.21);
         return baseBorder.Lerp(accent, isDark ? 0.04 : 0.05);
     }
 
-    private static Color ComputeContainerBackground(Color windowBackground, Color buttonFace)
+    private static Color ComputeContainerBackground(Color windowBackground, Color buttonFace, Color accent)
     {
         var isDark = IsDarkBackground(windowBackground);
-        return windowBackground.Lerp(buttonFace, isDark ? 0.5 : 0.25);
+        return windowBackground.Lerp(buttonFace, isDark ? 0.25 : 0.15).Lerp(accent, isDark ? 0.01 : 0.014);
     }
 
     private static Color ComputeDisabledText(Color windowBackground, Color windowText)
