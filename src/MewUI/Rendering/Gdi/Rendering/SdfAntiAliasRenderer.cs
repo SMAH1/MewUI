@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 
 using Aprillz.MewUI.Rendering.Gdi.Core;
 using Aprillz.MewUI.Rendering.Gdi.Sdf;
@@ -30,6 +31,7 @@ internal sealed class SdfAntiAliasRenderer
     /// <summary>
     /// Renders a filled shape using SDF-based anti-aliasing.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void RenderFilledShape(
         nint targetDc,
         int destX,
@@ -69,12 +71,15 @@ internal sealed class SdfAntiAliasRenderer
 
             try
             {
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
                 for (int py = 0; py < height; py++)
                 {
                     RenderFilledRow(alphaRow, py, width, sdf, sampler, srcA, aaWidth);
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally
@@ -96,6 +101,7 @@ internal sealed class SdfAntiAliasRenderer
     /// <summary>
     /// Renders a stroked shape using SDF-based anti-aliasing.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void RenderStrokedShape(
         nint targetDc,
         int destX,
@@ -136,12 +142,15 @@ internal sealed class SdfAntiAliasRenderer
 
             try
             {
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
                 for (int py = 0; py < height; py++)
                 {
                     RenderStrokeRow(alphaRow, py, width, outerSdf, innerSdf, sampler, srcA, aaWidth);
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally

@@ -1,4 +1,5 @@
 using Aprillz.MewUI.Native;
+using Aprillz.MewUI.Native.Structs;
 
 namespace Aprillz.MewUI.Rendering.Gdi;
 
@@ -50,6 +51,7 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
         private nint _memDc;
         private nint _bitmap;
         private nint _oldBitmap;
+        private nint _bits;
         private int _width;
         private int _height;
 
@@ -69,7 +71,8 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
             _height = Math.Max(1, height);
 
             _memDc = Gdi32.CreateCompatibleDC(screenDc);
-            _bitmap = Gdi32.CreateCompatibleBitmap(screenDc, _width, _height);
+            var bmi = BITMAPINFO.Create32bpp(_width, _height);
+            _bitmap = Gdi32.CreateDIBSection(screenDc, ref bmi, usage: 0, out _bits, 0, 0);
             _oldBitmap = Gdi32.SelectObject(_memDc, _bitmap);
         }
 
@@ -95,6 +98,7 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
             _memDc = 0;
             _bitmap = 0;
             _oldBitmap = 0;
+            _bits = 0;
             _width = 0;
             _height = 0;
         }

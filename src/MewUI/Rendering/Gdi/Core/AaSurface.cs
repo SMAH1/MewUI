@@ -179,6 +179,42 @@ internal sealed class AaSurface : IDisposable
     }
 
     /// <summary>
+    /// Alpha blends and stretches a region of this surface onto the target DC.
+    /// </summary>
+    public void AlphaBlendToStretch(nint targetDc, int destX, int destY, int destWidth, int destHeight)
+    {
+        AlphaBlendToStretch(targetDc, destX, destY, destWidth, destHeight, 0, 0, _width, _height);
+    }
+
+    /// <summary>
+    /// Alpha blends and stretches a region of this surface onto the target DC.
+    /// </summary>
+    public void AlphaBlendToStretch(
+        nint targetDc,
+        int destX,
+        int destY,
+        int destWidth,
+        int destHeight,
+        int srcX,
+        int srcY,
+        int srcWidth,
+        int srcHeight)
+    {
+        if (!IsValid || targetDc == 0)
+        {
+            return;
+        }
+
+        if (destWidth <= 0 || destHeight <= 0 || srcWidth <= 0 || srcHeight <= 0)
+        {
+            return;
+        }
+
+        var blend = BLENDFUNCTION.SourceOver(255);
+        Gdi32.AlphaBlend(targetDc, destX, destY, destWidth, destHeight, _memDc, srcX, srcY, srcWidth, srcHeight, blend);
+    }
+
+    /// <summary>
     /// Gets a span over the pixel data for direct manipulation.
     /// </summary>
     public unsafe Span<byte> GetPixelSpan()

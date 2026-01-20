@@ -9,6 +9,68 @@ namespace Aprillz.MewUI.Rendering.Gdi.Simd;
 internal static class GdiSimdDispatcher
 {
     /// <summary>
+    /// Builds a 256-entry premultiplied BGRA lookup table for the given source color.
+    /// Index by alpha (0..255) and store directly into a 32bpp BGRA buffer.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void BuildPremultipliedBgraTable(Span<uint> table, byte srcB, byte srcG, byte srcR)
+    {
+        if (table.Length < 256)
+        {
+            throw new ArgumentException("Table must have length >= 256.", nameof(table));
+        }
+
+        table[0] = 0;
+        for (int a = 1; a < 256; a++)
+        {
+            byte alpha = (byte)a;
+            byte pb = Premultiply8(srcB, alpha);
+            byte pg = Premultiply8(srcG, alpha);
+            byte pr = Premultiply8(srcR, alpha);
+            table[a] = (uint)(pb | (pg << 8) | (pr << 16) | (alpha << 24));
+        }
+    }
+
+    /// <summary>
+    /// Writes a row of premultiplied BGRA pixels using a prebuilt alpha table.
+    /// This avoids per-pixel premultiply math in tight loops.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static unsafe void WritePremultipliedBgraRow(byte* dstBgra, ReadOnlySpan<byte> alphaRow, ReadOnlySpan<uint> table)
+    {
+        if (dstBgra == null || alphaRow.Length == 0)
+        {
+            return;
+        }
+
+        if (table.Length < 256)
+        {
+            throw new ArgumentException("Table must have length >= 256.", nameof(table));
+        }
+
+        uint* dst = (uint*)dstBgra;
+        int count = alphaRow.Length;
+
+        fixed (byte* aPtr = alphaRow)
+        fixed (uint* tablePtr = table)
+        {
+            int i = 0;
+            for (; i + 4 <= count; i += 4)
+            {
+                dst[i + 0] = tablePtr[aPtr[i + 0]];
+                dst[i + 1] = tablePtr[aPtr[i + 1]];
+                dst[i + 2] = tablePtr[aPtr[i + 2]];
+                dst[i + 3] = tablePtr[aPtr[i + 3]];
+            }
+
+            for (; i < count; i++)
+            {
+                dst[i] = tablePtr[aPtr[i]];
+            }
+        }
+    }
+
+    /// <summary>
     /// Writes a row of premultiplied BGRA pixels from alpha values.
     /// Automatically uses the best available SIMD implementation.
     /// </summary>

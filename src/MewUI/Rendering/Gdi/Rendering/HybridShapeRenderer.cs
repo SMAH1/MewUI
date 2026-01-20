@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 
 using Aprillz.MewUI.Rendering.Gdi.Core;
 using Aprillz.MewUI.Rendering.Gdi.Sdf;
@@ -27,6 +28,7 @@ internal sealed class HybridShapeRenderer
     /// Renders a filled rounded rectangle with anti-aliasing.
     /// Uses span-based optimization for rows.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void FillRoundedRectangle(
         nint targetDc,
         int destX,
@@ -72,6 +74,9 @@ internal sealed class HybridShapeRenderer
 
             try
             {
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
                 for (int py = 0; py < height; py++)
                 {
                     // Convert to shape coordinates (centered)
@@ -124,7 +129,7 @@ internal sealed class HybridShapeRenderer
                     }
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally
@@ -148,6 +153,7 @@ internal sealed class HybridShapeRenderer
     /// Uses inside stroke alignment: stroke is entirely within bounds.
     /// For bounds 10x10 with stroke 1, the interior is 8x8.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void DrawRoundedRectangle(
         nint targetDc,
         int destX,
@@ -218,53 +224,121 @@ internal sealed class HybridShapeRenderer
 
             try
             {
-                const float aaWidth = 1.0f;
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
 
                 for (int py = 0; py < surfaceH; py++)
                 {
-                    for (int px = 0; px < surfaceW; px++)
+                    alphaRow.Clear();
+
+                    float y = py + 0.5f - halfSurfaceH;
+
+                    outerSdf.GetSpanAtY(y, out float xLeftOuter, out float xRightOuter);
+                    if (xLeftOuter == 0 && xRightOuter == 0)
                     {
-                        float x = px + 0.5f - halfSurfaceW;
-                        float y = py + 0.5f - halfSurfaceH;
+                        byte* rowPtr0 = basePtr + py * stride;
+                        GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr0, alphaRow, premulTable);
+                        continue;
+                    }
 
-                        float outerDist = outerSdf.GetSignedDistance(x, y);
-                        if (outerDist >= aaWidth)
+                    float pxLeftOuter = xLeftOuter + halfSurfaceW;
+                    float pxRightOuter = xRightOuter + halfSurfaceW;
+
+                    int outerSolidStart = (int)MathF.Ceiling(pxLeftOuter);
+                    int outerSolidEnd = (int)MathF.Floor(pxRightOuter);
+                    outerSolidStart = Math.Clamp(outerSolidStart, 0, surfaceW);
+                    outerSolidEnd = Math.Clamp(outerSolidEnd, 0, surfaceW);
+
+                    int edgePad = _supersampleFactor == 1 ? 1 : 2;
+                    int outerEdgeL0 = Math.Max(0, outerSolidStart - edgePad);
+                    int outerEdgeL1 = Math.Min(surfaceW, outerSolidStart + edgePad);
+                    int outerEdgeR0 = Math.Max(0, outerSolidEnd - edgePad);
+                    int outerEdgeR1 = Math.Min(surfaceW, outerSolidEnd + edgePad);
+
+                    bool hasInnerSpan = false;
+                    int innerLeftEdge = 0;
+                    int innerRightEdge = 0;
+                    int innerEdgeL0 = 0;
+                    int innerEdgeL1 = 0;
+                    int innerEdgeR0 = 0;
+                    int innerEdgeR1 = 0;
+
+                    if (innerSdf != null)
+                    {
+                        innerSdf.GetSpanAtY(y, out float xLeftInner, out float xRightInner);
+                        if (!(xLeftInner == 0 && xRightInner == 0))
                         {
-                            alphaRow[px] = 0;
-                            continue;
+                            hasInnerSpan = true;
+                            float pxLeftInner = xLeftInner + halfSurfaceW;
+                            float pxRightInner = xRightInner + halfSurfaceW;
+
+                            innerLeftEdge = Math.Clamp((int)MathF.Floor(pxLeftInner), 0, surfaceW);
+                            innerRightEdge = Math.Clamp((int)MathF.Ceiling(pxRightInner), 0, surfaceW);
+
+                            innerEdgeL0 = Math.Max(0, innerLeftEdge - edgePad);
+                            innerEdgeL1 = Math.Min(surfaceW, innerLeftEdge + edgePad);
+                            innerEdgeR0 = Math.Max(0, innerRightEdge - edgePad);
+                            innerEdgeR1 = Math.Min(surfaceW, innerRightEdge + edgePad);
+                        }
+                    }
+
+                    if (!hasInnerSpan)
+                    {
+                        int solidStart = Math.Min(outerSolidStart, outerSolidEnd);
+                        int solidEnd = Math.Max(outerSolidStart, outerSolidEnd);
+                        if (solidStart < solidEnd)
+                        {
+                            alphaRow.Slice(solidStart, solidEnd - solidStart).Fill(srcA);
+                        }
+                    }
+                    else
+                    {
+                        int leftSolidStart = outerSolidStart;
+                        int leftSolidEnd = Math.Min(outerSolidEnd, innerLeftEdge);
+                        if (leftSolidStart < leftSolidEnd)
+                        {
+                            alphaRow.Slice(leftSolidStart, leftSolidEnd - leftSolidStart).Fill(srcA);
                         }
 
-                        if (innerSdf != null)
+                        int rightSolidStart = Math.Max(outerSolidStart, innerRightEdge);
+                        int rightSolidEnd = outerSolidEnd;
+                        if (rightSolidStart < rightSolidEnd)
                         {
-                            float innerDist = innerSdf.GetSignedDistance(x, y);
+                            alphaRow.Slice(rightSolidStart, rightSolidEnd - rightSolidStart).Fill(srcA);
+                        }
+                    }
 
-                            if (innerDist <= -aaWidth)
-                            {
-                                alphaRow[px] = 0;
-                                continue;
-                            }
+                    // Outer edge AA
+                    for (int px = outerEdgeL0; px < outerEdgeL1; px++)
+                    {
+                        alphaRow[px] = innerSdf != null
+                            ? sampler.SampleRoundedRectStrokeEdgeSsaa(px, py, outerSdf, innerSdf, halfSurfaceW, halfSurfaceH)
+                            : sampler.SampleRoundedRectEdge(px, py, outerSdf, halfSurfaceW, halfSurfaceH);
+                    }
 
-                            if (outerDist <= -aaWidth && innerDist >= aaWidth)
-                            {
-                                alphaRow[px] = srcA;
-                                continue;
-                            }
+                    for (int px = outerEdgeR0; px < outerEdgeR1; px++)
+                    {
+                        alphaRow[px] = innerSdf != null
+                            ? sampler.SampleRoundedRectStrokeEdgeSsaa(px, py, outerSdf, innerSdf, halfSurfaceW, halfSurfaceH)
+                            : sampler.SampleRoundedRectEdge(px, py, outerSdf, halfSurfaceW, halfSurfaceH);
+                    }
 
-                            alphaRow[px] = sampler.SampleStrokeEdgeCentered(px, py, outerSdf, innerSdf, halfSurfaceW, halfSurfaceH);
-                            continue;
+                    // Inner edge AA
+                    if (hasInnerSpan)
+                    {
+                        for (int px = innerEdgeL0; px < innerEdgeL1; px++)
+                        {
+                            alphaRow[px] = sampler.SampleRoundedRectStrokeEdgeSsaa(px, py, outerSdf, innerSdf, halfSurfaceW, halfSurfaceH);
                         }
 
-                        if (outerDist <= -aaWidth)
+                        for (int px = innerEdgeR0; px < innerEdgeR1; px++)
                         {
-                            alphaRow[px] = srcA;
-                            continue;
+                            alphaRow[px] = sampler.SampleRoundedRectStrokeEdgeSsaa(px, py, outerSdf, innerSdf, halfSurfaceW, halfSurfaceH);
                         }
-
-                        alphaRow[px] = sampler.SampleEdgeCentered(px, py, outerSdf, halfSurfaceW, halfSurfaceH);
                     }
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally
@@ -291,6 +365,7 @@ internal sealed class HybridShapeRenderer
     /// <summary>
     /// Renders a filled ellipse with anti-aliasing.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void FillEllipse(
         nint targetDc,
         int destX,
@@ -335,6 +410,9 @@ internal sealed class HybridShapeRenderer
 
             try
             {
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
                 for (int py = 0; py < height; py++)
                 {
                     float yCenter = py + 0.5f;
@@ -387,7 +465,7 @@ internal sealed class HybridShapeRenderer
                     }
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally
@@ -411,6 +489,7 @@ internal sealed class HybridShapeRenderer
     /// Uses inside stroke alignment: stroke is entirely within bounds.
     /// For bounds 10x10 with stroke 1, the interior is 8x8.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void DrawEllipse(
         nint targetDc,
         int destX,
@@ -473,6 +552,9 @@ internal sealed class HybridShapeRenderer
 
             try
             {
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
                 for (int py = 0; py < surfaceH; py++)
                 {
                     alphaRow.Clear();
@@ -484,7 +566,7 @@ internal sealed class HybridShapeRenderer
                     if (tOut <= 0)
                     {
                         byte* rowPtr0 = basePtr + py * stride;
-                        GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr0, alphaRow, srcB, srcG, srcR);
+                        GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr0, alphaRow, premulTable);
                         continue;
                     }
 
@@ -502,7 +584,7 @@ internal sealed class HybridShapeRenderer
                     }
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally
@@ -529,6 +611,7 @@ internal sealed class HybridShapeRenderer
     /// <summary>
     /// Renders an anti-aliased line.
     /// </summary>
+    [SkipLocalsInit]
     public unsafe void DrawLine(
         nint targetDc,
         float ax,
@@ -590,6 +673,9 @@ internal sealed class HybridShapeRenderer
 
             try
             {
+                Span<uint> premulTable = stackalloc uint[256];
+                GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
                 for (int py = 0; py < height; py++)
                 {
                     alphaRow.Clear();
@@ -600,7 +686,7 @@ internal sealed class HybridShapeRenderer
                     }
 
                     byte* rowPtr = basePtr + py * stride;
-                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, srcB, srcG, srcR);
+                    GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
                 }
             }
             finally

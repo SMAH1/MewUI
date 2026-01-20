@@ -14,8 +14,6 @@ namespace Aprillz.MewUI.Rendering.Gdi;
 /// </summary>
 internal sealed class GdiGraphicsContext : IGraphicsContext
 {
-    private static readonly bool _logShapes = true;
-
     private readonly nint _hwnd;
     private readonly bool _ownsDc;
     private readonly GdiCurveQuality _curveQuality;
@@ -26,6 +24,8 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
     private readonly GdiPrimitiveRenderer _primitiveRenderer;
     private HybridShapeRenderer? _shapeRenderer;
     private readonly AaSurfacePool _surfacePool;
+    private readonly AaSurface _alphaPixelSurface;
+    private uint _alphaPixel;
 
     private bool _disposed;
 
@@ -51,6 +51,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
         _stateManager = new GdiStateManager(hdc, dpiScale);
         _primitiveRenderer = new GdiPrimitiveRenderer(hdc, _stateManager);
         _surfacePool = new AaSurfacePool();
+        _alphaPixelSurface = new AaSurface(hdc, 1, 1);
 
         if (curveQuality != GdiCurveQuality.Fast)
         {
@@ -69,6 +70,186 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
         return _shapeRenderer;
     }
 
+    private static uint GetPremultipliedBgraPixel(Color color)
+    {
+        // Premultiply for AlphaBlend with AC_SRC_ALPHA.
+        uint a = color.A;
+        uint r = (uint)(color.R * a + 127) / 255;
+        uint g = (uint)(color.G * a + 127) / 255;
+        uint b = (uint)(color.B * a + 127) / 255;
+
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private unsafe void AlphaFillRectangleFast(int destX, int destY, int width, int height, Color color)
+    {
+        if (width <= 0 || height <= 0 || color.A == 0)
+        {
+            return;
+        }
+
+        // Fast fill via stretching a cached 1x1 premultiplied pixel surface.
+        // This avoids writing WxH pixels on CPU; AlphaBlend still covers the target area but with far less setup overhead.
+        if (_alphaPixelSurface.IsValid)
+        {
+            uint pixel = GetPremultipliedBgraPixel(color);
+            if (_alphaPixel != pixel)
+            {
+                byte* p = _alphaPixelSurface.GetRowPointer(0);
+                if (p == null)
+                {
+                    return;
+                }
+
+                *(uint*)p = pixel;
+                _alphaPixel = pixel;
+            }
+
+            _alphaPixelSurface.AlphaBlendToStretch(Hdc, destX, destY, width, height);
+            return;
+        }
+
+        // Fallback: render into a dedicated surface and alpha blend.
+        var surface = _surfacePool.Rent(Hdc, width, height);
+        if (!surface.IsValid)
+        {
+            return;
+        }
+
+        try
+        {
+            uint pixel = GetPremultipliedBgraPixel(color);
+
+            for (int y = 0; y < height; y++)
+            {
+                byte* rowPtr = surface.GetRowPointer(y);
+                if (rowPtr == null)
+                {
+                    return;
+                }
+
+                new Span<uint>((void*)rowPtr, width).Fill(pixel);
+            }
+
+            surface.AlphaBlendTo(Hdc, destX, destY, width, height, 0, 0);
+        }
+        finally
+        {
+            _surfacePool.Return(surface);
+        }
+    }
+
+    private unsafe void AlphaDrawRectangleFast(int destX, int destY, int width, int height, Color color, int thicknessPx)
+    {
+        if (width <= 0 || height <= 0 || color.A == 0 || thicknessPx <= 0)
+        {
+            return;
+        }
+
+        thicknessPx = Math.Min(thicknessPx, Math.Min(width / 2, height / 2));
+        if (thicknessPx <= 0)
+        {
+            return;
+        }
+
+        // AlphaBlend is expensive; avoid blending a full WxH area for a thin border.
+        // Render only the non-overlapping strips (top/bottom + left/right excluding corners).
+        int topH = Math.Min(thicknessPx, height);
+        int bottomStart = Math.Max(topH, height - thicknessPx);
+        int bottomH = height - bottomStart;
+
+        int middleY = topH;
+        int middleH = Math.Max(0, bottomStart - topH);
+
+        int sideW = Math.Min(thicknessPx, width);
+        int rightX = width - sideW;
+
+        long fullArea = (long)width * height;
+        long borderArea = (long)width * topH + (long)width * bottomH;
+        if (middleH > 0 && sideW > 0)
+        {
+            // Left + right borders (excluding top/bottom already counted).
+            borderArea += (long)sideW * middleH;
+            if (rightX != 0)
+            {
+                borderArea += (long)sideW * middleH;
+            }
+        }
+
+        // Heuristic: for small rects or thick borders, a single AlphaBlend can be cheaper than 3-4 calls.
+        bool useSingleBlend = fullArea <= 4096 || borderArea * 2 >= fullArea;
+
+        if (useSingleBlend || !_alphaPixelSurface.IsValid)
+        {
+            var surface = _surfacePool.Rent(Hdc, width, height);
+            if (!surface.IsValid)
+            {
+                return;
+            }
+
+            try
+            {
+                uint pixel = GetPremultipliedBgraPixel(color);
+
+                for (int y = 0; y < height; y++)
+                {
+                    byte* rowPtr = surface.GetRowPointer(y);
+                    if (rowPtr == null)
+                    {
+                        return;
+                    }
+
+                    var row = new Span<uint>((void*)rowPtr, width);
+
+                    if (y < topH || y >= bottomStart)
+                    {
+                        row.Fill(pixel);
+                        continue;
+                    }
+
+                    row.Clear();
+                    if (sideW > 0)
+                    {
+                        row.Slice(0, sideW).Fill(pixel);
+                        if (rightX != 0)
+                        {
+                            row.Slice(rightX, sideW).Fill(pixel);
+                        }
+                    }
+                }
+
+                surface.AlphaBlendTo(Hdc, destX, destY, width, height, 0, 0);
+            }
+            finally
+            {
+                _surfacePool.Return(surface);
+            }
+
+            return;
+        }
+
+        // Thin border: minimize blended area by drawing strips.
+        if (topH > 0)
+        {
+            AlphaFillRectangleFast(destX, destY, width, topH, color);
+        }
+
+        if (bottomH > 0)
+        {
+            AlphaFillRectangleFast(destX, destY + bottomStart, width, bottomH, color);
+        }
+
+        if (middleH > 0 && sideW > 0 && rightX >= 0)
+        {
+            AlphaFillRectangleFast(destX, destY + middleY, sideW, middleH, color);
+
+            if (rightX != 0)
+            {
+                AlphaFillRectangleFast(destX + rightX, destY + middleY, sideW, middleH, color);
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (!_disposed)
@@ -78,6 +259,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
                 User32.ReleaseDC(_hwnd, Hdc);
             }
 
+            _alphaPixelSurface.Dispose();
             _primitiveRenderer.Dispose();
             _surfacePool.Dispose();
 
@@ -99,7 +281,10 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
 
     #region Drawing Primitives
 
-    public void Clear(Color color) => _primitiveRenderer.Clear(_hwnd, color);
+    public void Clear(Color color)
+    {
+        _primitiveRenderer.Clear(_hwnd, color);
+    }
 
     public void DrawLine(Point start, Point end, Color color, double thickness = 1)
     {
@@ -122,32 +307,30 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
                 color.B, color.G, color.R, color.A);
             return;
         }
-        else
+
+        // Check if line is axis-aligned (no AA needed)
+        var (ax0, ay0) = _stateManager.ToDeviceCoords(start.X, start.Y);
+        var (bx0, by0) = _stateManager.ToDeviceCoords(end.X, end.Y);
+
+        double dx = bx0 - ax0;
+        double dy = by0 - ay0;
+
+        bool isAxisAligned = Math.Abs(dx) < GdiRenderingConstants.Epsilon || Math.Abs(dy) < GdiRenderingConstants.Epsilon;
+
+        if (isAxisAligned || _curveQuality == GdiCurveQuality.Fast || _shapeRenderer == null)
         {
-            // Check if line is axis-aligned (no AA needed)
-            var (ax, ay) = _stateManager.ToDeviceCoords(start.X, start.Y);
-            var (bx, by) = _stateManager.ToDeviceCoords(end.X, end.Y);
-
-            double dx = bx - ax;
-            double dy = by - ay;
-
-            bool isAxisAligned = Math.Abs(dx) < GdiRenderingConstants.Epsilon || Math.Abs(dy) < GdiRenderingConstants.Epsilon;
-
-            if (isAxisAligned || _shapeRenderer == null)
-            {
-                _primitiveRenderer.DrawLine(start, end, color, thickness);
-                return;
-            }
-
-            // Use AA renderer for non-axis-aligned lines
-            float strokePx = (float)_stateManager.ToDevicePx(thickness);
-            _shapeRenderer.DrawLine(
-                Hdc,
-                (float)ax, (float)ay,
-                (float)bx, (float)by,
-                strokePx,
-                color.B, color.G, color.R, color.A);
+            _primitiveRenderer.DrawLine(start, end, color, thickness);
+            return;
         }
+
+        // Use AA renderer for non-axis-aligned lines
+        float strokePx1 = (float)_stateManager.ToDevicePx(thickness);
+        _shapeRenderer.DrawLine(
+            Hdc,
+            (float)ax0, (float)ay0,
+            (float)bx0, (float)by0,
+            strokePx1,
+            color.B, color.G, color.R, color.A);
     }
 
     public void DrawRectangle(Rect rect, Color color, double thickness = 1)
@@ -157,21 +340,16 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
             return;
         }
 
+        var dst = _stateManager.ToDeviceRect(rect);
+        if (dst.Width <= 0 || dst.Height <= 0)
+        {
+            return;
+        }
+
         if (color.A < 255)
         {
-            var dst = _stateManager.ToDeviceRect(rect);
-            if (dst.Width <= 0 || dst.Height <= 0)
-            {
-                return;
-            }
-
-            float strokePx = (float)_stateManager.ToDevicePx(thickness);
-            GetShapeRendererForAlpha().DrawRoundedRectangle(
-                Hdc,
-                dst.left, dst.top,
-                dst.Width, dst.Height,
-                0, 0, strokePx,
-                color.B, color.G, color.R, color.A);
+            int tPx = _stateManager.QuantizePenWidthPx(thickness);
+            AlphaDrawRectangleFast(dst.left, dst.top, dst.Width, dst.Height, color, tPx);
             return;
         }
 
@@ -185,20 +363,15 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
             return;
         }
 
+        var dst = _stateManager.ToDeviceRect(rect);
+        if (dst.Width <= 0 || dst.Height <= 0)
+        {
+            return;
+        }
+
         if (color.A < 255)
         {
-            var dst = _stateManager.ToDeviceRect(rect);
-            if (dst.Width <= 0 || dst.Height <= 0)
-            {
-                return;
-            }
-
-            GetShapeRendererForAlpha().FillRoundedRectangle(
-                Hdc,
-                dst.left, dst.top,
-                dst.Width, dst.Height,
-                0, 0,
-                color.B, color.G, color.R, color.A);
+            AlphaFillRectangleFast(dst.left, dst.top, dst.Width, dst.Height, color);
             return;
         }
 
@@ -251,8 +424,6 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
             return;
         }
 
-        var renderer = _shapeRenderer ?? GetShapeRendererForAlpha();
-
         var dst = _stateManager.ToDeviceRect(rect);
         if (dst.Width <= 0 || dst.Height <= 0)
         {
@@ -261,6 +432,8 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
 
         float rx = (float)_stateManager.ToDevicePx(radiusX);
         float ry = (float)_stateManager.ToDevicePx(radiusY);
+
+        var renderer = _shapeRenderer ?? GetShapeRendererForAlpha();
 
         renderer.FillRoundedRectangle(
             Hdc,

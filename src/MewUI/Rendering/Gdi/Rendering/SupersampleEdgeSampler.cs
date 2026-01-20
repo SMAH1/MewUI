@@ -126,6 +126,41 @@ internal sealed class SupersampleEdgeSampler : EdgeSamplerBase
         return CoverageToAlpha(covered, _totalSamples, _sourceAlpha);
     }
 
+    public byte SampleRoundedRectStrokeEdgeSsaa(
+        int px,
+        int py,
+        RoundedRectSdf outerSdf,
+        RoundedRectSdf? innerSdf,
+        float halfSurfaceW,
+        float halfSurfaceH)
+    {
+        int covered = 0;
+
+        for (int sy = 0; sy < _factor; sy++)
+        {
+            float y = py + (sy + 0.5f) / _factor - halfSurfaceH;
+
+            for (int sx = 0; sx < _factor; sx++)
+            {
+                float x = px + (sx + 0.5f) / _factor - halfSurfaceW;
+
+                if (!outerSdf.IsInside(x, y))
+                {
+                    continue;
+                }
+
+                if (innerSdf != null && innerSdf.IsInside(x, y))
+                {
+                    continue;
+                }
+
+                covered++;
+            }
+        }
+
+        return CoverageToAlpha(covered, _totalSamples, _sourceAlpha);
+    }
+
     /// <summary>
     /// Samples edge for an ellipse.
     /// Optimized for the specific shape.
