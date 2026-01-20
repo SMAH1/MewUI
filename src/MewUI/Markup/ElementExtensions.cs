@@ -155,6 +155,12 @@ public static class ElementExtensions
 
     #region Padding
 
+    public static T Padding<T>(this T element, Thickness padding) where T : FrameworkElement
+    {
+        element.Padding = padding;
+        return element;
+    }
+
     public static T Padding<T>(this T element, double uniform) where T : FrameworkElement
     {
         element.Padding = new Thickness(uniform);
