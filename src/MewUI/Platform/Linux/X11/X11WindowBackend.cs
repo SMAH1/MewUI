@@ -1,10 +1,10 @@
-using Aprillz.MewUI.Controls;
 using System.Runtime.InteropServices;
+
 using Aprillz.MewUI.Native;
-using NativeX11 = Aprillz.MewUI.Native.X11;
 using Aprillz.MewUI.Rendering.OpenGL;
-using Aprillz.MewUI;
 using Aprillz.MewUI.Resources;
+
+using NativeX11 = Aprillz.MewUI.Native.X11;
 
 namespace Aprillz.MewUI.Platform.Linux.X11;
 
@@ -16,6 +16,7 @@ internal sealed class X11WindowBackend : IWindowBackend
     private bool _shown;
     private bool _disposed;
     private bool _cleanupDone;
+    private bool _closedRaised;
     private nint _wmDeleteWindowAtom;
     private nint _wmProtocolsAtom;
     private bool _needsRender;
@@ -63,10 +64,16 @@ internal sealed class X11WindowBackend : IWindowBackend
 
     public void Close()
     {
-        if (Display != 0 && Handle != 0)
+        // Cleanup immediately to avoid X errors from late render/layout passes
+        // that may query window attributes after the server has destroyed the window.
+        var handle = Handle;
+        if (Display == 0 || handle == 0)
         {
-            NativeX11.XDestroyWindow(Display, Handle);
+            return;
         }
+
+        RaiseClosedOnce();
+        Cleanup(handle, destroyWindow: true);
     }
 
     public void Invalidate(bool erase)
@@ -476,7 +483,7 @@ internal sealed class X11WindowBackend : IWindowBackend
 
             case DestroyNotify:
                 // Ensure we unregister and release resources even if the window is destroyed externally.
-                Window.RaiseClosed();
+                RaiseClosedOnce();
                 Cleanup(ev.xdestroywindow.window, destroyWindow: false);
                 break;
 
@@ -835,6 +842,7 @@ internal sealed class X11WindowBackend : IWindowBackend
             _capturedElement = null;
         }
 
+        RaiseClosedOnce();
         Cleanup(Handle, destroyWindow: true);
 
         // Display lifetime is managed by the platform host (shared across windows).
@@ -877,5 +885,16 @@ internal sealed class X11WindowBackend : IWindowBackend
         {
             Handle = 0;
         }
+    }
+
+    private void RaiseClosedOnce()
+    {
+        if (_closedRaised)
+        {
+            return;
+        }
+
+        _closedRaised = true;
+        try { Window.RaiseClosed(); } catch { }
     }
 }

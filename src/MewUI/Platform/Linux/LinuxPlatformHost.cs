@@ -8,7 +8,7 @@ public sealed class LinuxPlatformHost : IPlatformHost
 {
     private readonly IMessageBoxService _messageBox = new LinuxMessageBoxService();
     private readonly IFileDialogService _fileDialog = new LinuxFileDialogService();
-    private readonly IClipboardService _clipboard = new NoClipboardService();
+    private readonly IClipboardService _clipboard = new LinuxClipboardService();
 
     public IMessageBoxService MessageBox => _messageBox;
 

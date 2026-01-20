@@ -16,7 +16,7 @@ public sealed class X11PlatformHost : IPlatformHost
     private readonly Dictionary<nint, X11WindowBackend> _windows = new();
     private readonly IMessageBoxService _messageBox = new X11MessageBoxService();
     private readonly IFileDialogService _fileDialog = new X11FileDialogService();
-    private readonly IClipboardService _clipboard = new NoClipboardService();
+    private readonly IClipboardService _clipboard = new LinuxClipboardService();
     private bool _running;
     private nint _display;
     private uint _systemDpi = 96u;
