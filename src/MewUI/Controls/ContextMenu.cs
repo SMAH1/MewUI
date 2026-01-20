@@ -8,6 +8,11 @@ public sealed class ContextMenu : Control, IPopupOwner
     private const double ShortcutColumnGap = 12;
 
     private readonly Menu _menu;
+    private readonly ScrollBar _vBar;
+    private readonly ScrollController _scroll = new();
+    private double _extentHeight;
+    private double _viewportHeight;
+    private double _verticalOffset;
     private int _hotIndex = -1;
     private ContextMenu? _openSubMenu;
     private int _openSubMenuIndex = -1;
@@ -59,6 +64,12 @@ public sealed class ContextMenu : Control, IPopupOwner
         }
         BorderThickness = 1;
         Padding = new Thickness(1);
+
+        _vBar = new ScrollBar { Orientation = Orientation.Vertical, IsVisible = false, Parent = this };
+        _vBar.ValueChanged += v =>
+        {
+            UpdateScrollFromBar(v);
+        };
     }
 
     protected override Color DefaultBackground => Theme.Current.Palette.ControlBackground;
@@ -180,12 +191,57 @@ public sealed class ContextMenu : Control, IPopupOwner
         return ResolveItemHeight();
     }
 
+    private void UpdateScrollFromBar(double valueDip)
+    {
+        if (!_vBar.IsVisible)
+        {
+            return;
+        }
+
+        var dpiScale = GetDpi() / 96.0;
+        _scroll.DpiScale = dpiScale;
+        _scroll.SetMetricsDip(1, _extentHeight, _viewportHeight);
+        if (_scroll.SetOffsetDip(1, valueDip))
+        {
+            _verticalOffset = _scroll.GetOffsetDip(1);
+            CloseSubMenu();
+            InvalidateVisual();
+        }
+    }
+
+    private Rect GetContentViewportBounds()
+    {
+        var bounds = GetSnappedBorderBounds(Bounds);
+        var dpiScale = GetDpi() / 96.0;
+        var borderInset = GetBorderVisualInset();
+        var innerBounds = bounds.Deflate(new Thickness(borderInset));
+        return LayoutRounding.SnapRectEdgesToPixels(innerBounds.Deflate(Padding), dpiScale);
+    }
+
+    private Rect GetItemViewportBounds()
+    {
+        var contentBounds = GetContentViewportBounds();
+        if (!_vBar.IsVisible)
+        {
+            return contentBounds;
+        }
+
+        var dpiScale = GetDpi() / 96.0;
+        double t = GetTheme().ScrollBarHitThickness;
+        return LayoutRounding.SnapRectEdgesToPixels(new Rect(
+            contentBounds.X,
+            contentBounds.Y,
+            Math.Max(0, contentBounds.Width - t),
+            contentBounds.Height), dpiScale);
+    }
+
     protected override Size MeasureContent(Size availableSize)
     {
         var borderInset = GetBorderVisualInset();
 
         double height = 0;
         double itemHeight = ResolveItemHeight();
+        var theme = GetTheme();
 
         using var measure = BeginTextMeasurement();
 
@@ -237,6 +293,8 @@ public sealed class ContextMenu : Control, IPopupOwner
         double contentW = maxWidth + Padding.HorizontalThickness;
         double contentH = height + Padding.VerticalThickness;
 
+        _extentHeight = height;
+
         // Cap height (scrolling can come later).
         double maxH = Math.Max(0, MaxMenuHeight);
         if (maxH > 0)
@@ -244,7 +302,53 @@ public sealed class ContextMenu : Control, IPopupOwner
             contentH = Math.Min(contentH, maxH);
         }
 
+        _viewportHeight = Math.Max(0, contentH - Padding.VerticalThickness);
+
         return new Size(contentW, contentH).Inflate(new Thickness(borderInset));
+    }
+
+    protected override void ArrangeContent(Rect bounds)
+    {
+        base.ArrangeContent(bounds);
+
+        var theme = GetTheme();
+        var snapped = GetSnappedBorderBounds(bounds);
+        var borderInset = GetBorderVisualInset();
+        var dpiScale = GetDpi() / 96.0;
+        var innerBounds = snapped.Deflate(new Thickness(borderInset));
+        var contentBounds = LayoutRounding.SnapRectEdgesToPixels(innerBounds.Deflate(Padding), dpiScale);
+        _viewportHeight = Math.Max(0, contentBounds.Height);
+
+        bool needV = _extentHeight > _viewportHeight + 0.5;
+        _vBar.IsVisible = needV;
+
+        if (!needV)
+        {
+            _verticalOffset = 0;
+            _vBar.Value = 0;
+            _vBar.Arrange(Rect.Empty);
+            return;
+        }
+
+        double t = theme.ScrollBarHitThickness;
+        var itemBounds = new Rect(contentBounds.X, contentBounds.Y, Math.Max(0, contentBounds.Width - t), contentBounds.Height);
+        _scroll.DpiScale = dpiScale;
+        _scroll.SetMetricsDip(1, _extentHeight, _viewportHeight);
+        _scroll.SetOffsetDip(1, _verticalOffset);
+        _verticalOffset = _scroll.GetOffsetDip(1);
+
+        _vBar.Minimum = 0;
+        _vBar.Maximum = _scroll.GetMaxDip(1);
+        _vBar.ViewportSize = _viewportHeight;
+        _vBar.SmallChange = theme.ScrollBarSmallChange;
+        _vBar.LargeChange = theme.ScrollBarLargeChange;
+        _vBar.Value = _verticalOffset;
+
+        _vBar.Arrange(new Rect(
+            itemBounds.Right,
+            itemBounds.Y,
+            t,
+            Math.Max(0, itemBounds.Height)));
     }
 
     protected override void OnMouseLeave()
@@ -254,6 +358,33 @@ public sealed class ContextMenu : Control, IPopupOwner
         {
             _hotIndex = -1;
             InvalidateVisual();
+        }
+    }
+
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        if (e.Handled || !_vBar.IsVisible)
+        {
+            return;
+        }
+
+        int notches = Math.Sign(e.Delta);
+        if (notches == 0)
+        {
+            return;
+        }
+
+        var dpiScale = GetDpi() / 96.0;
+        _scroll.DpiScale = dpiScale;
+        _scroll.SetMetricsDip(1, _extentHeight, _viewportHeight);
+        if (_scroll.ScrollByNotches(1, -notches, GetTheme().ScrollWheelStep))
+        {
+            _verticalOffset = _scroll.GetOffsetDip(1);
+            _vBar.Value = _verticalOffset;
+            CloseSubMenu();
+            InvalidateVisual();
+            e.Handled = true;
         }
     }
 
@@ -472,17 +603,19 @@ public sealed class ContextMenu : Control, IPopupOwner
 
     private int HitTestEntryIndex(Point position)
     {
-        var bounds = GetSnappedBorderBounds(Bounds);
-        var borderInset = GetBorderVisualInset();
-        var innerBounds = bounds.Deflate(new Thickness(borderInset));
-        var contentBounds = innerBounds.Deflate(Padding);
+        if (_vBar.IsVisible && _vBar.Bounds.Contains(position))
+        {
+            return -1;
+        }
+
+        var contentBounds = GetItemViewportBounds();
 
         if (!contentBounds.Contains(position))
         {
             return -1;
         }
 
-        double y = position.Y - contentBounds.Y;
+        double y = (position.Y - contentBounds.Y) + _verticalOffset;
         double acc = 0;
         for (int i = 0; i < Items.Count; i++)
         {
@@ -506,12 +639,9 @@ public sealed class ContextMenu : Control, IPopupOwner
             return false;
         }
 
-        var bounds = GetSnappedBorderBounds(Bounds);
-        var borderInset = GetBorderVisualInset();
-        var innerBounds = bounds.Deflate(new Thickness(borderInset));
-        var contentBounds = innerBounds.Deflate(Padding);
+        var contentBounds = GetItemViewportBounds();
 
-        double y = contentBounds.Y;
+        double y = contentBounds.Y - _verticalOffset;
         for (int i = 0; i < Items.Count; i++)
         {
             double h = GetEntryHeight(Items[i]);
@@ -527,10 +657,26 @@ public sealed class ContextMenu : Control, IPopupOwner
         return false;
     }
 
+    protected override UIElement? OnHitTest(Point point)
+    {
+        if (!IsVisible || !IsHitTestVisible || !IsEffectivelyEnabled)
+        {
+            return null;
+        }
+
+        if (_vBar.IsVisible && _vBar.Bounds.Contains(point))
+        {
+            return _vBar;
+        }
+
+        return base.OnHitTest(point);
+    }
+
     protected override void OnRender(IGraphicsContext context)
     {
         var theme = GetTheme();
         var bounds = GetSnappedBorderBounds(Bounds);
+        var dpiScale = GetDpi() / 96.0;
         double radius = theme.ControlCornerRadius;
         var borderInset = GetBorderVisualInset();
         double itemRadius = Math.Max(0, radius - borderInset);
@@ -538,7 +684,7 @@ public sealed class ContextMenu : Control, IPopupOwner
         DrawBackgroundAndBorder(context, bounds, Background, BorderBrush, radius);
 
         var innerBounds = bounds.Deflate(new Thickness(borderInset));
-        var contentBounds = innerBounds.Deflate(Padding);
+        var contentBounds = GetContentViewportBounds();
         if (contentBounds.Width <= 0 || contentBounds.Height <= 0)
         {
             return;
@@ -547,24 +693,39 @@ public sealed class ContextMenu : Control, IPopupOwner
         using var measure = BeginTextMeasurement();
         var font = measure.Font;
 
-        double y = contentBounds.Y;
+        context.Save();
+        context.SetClip(LayoutRounding.ExpandClipByDevicePixels(contentBounds, dpiScale));
+
+        double barOverlayWidth = _vBar.IsVisible ? theme.ScrollBarHitThickness : 0;
+        double y = contentBounds.Y - _verticalOffset;
         for (int i = 0; i < Items.Count; i++)
         {
             var entry = Items[i];
             double h = GetEntryHeight(entry);
             var row = new Rect(contentBounds.X, y, contentBounds.Width, h);
+            if (row.Bottom < contentBounds.Y)
+            {
+                y += h;
+                continue;
+            }
+
+            // Keep content (text/chevrons/separators) out of the scrollbar overlay area,
+            // but allow background/selection to extend under the overlay.
+            var layoutRow = barOverlayWidth > 0
+                ? new Rect(row.X, row.Y, Math.Max(0, row.Width - barOverlayWidth), row.Height)
+                : row;
 
             if (entry is MenuSeparator)
             {
                 var sepY = row.Y + (row.Height - 1) / 2;
-                context.DrawLine(new Point(row.X + 4, sepY), new Point(row.Right - 4, sepY), theme.Palette.ControlBorder, 1);
+                context.DrawLine(new Point(layoutRow.X + 4, sepY), new Point(layoutRow.Right - 4, sepY), theme.Palette.ControlBorder, 1);
                 y += h;
                 continue;
             }
 
             if (entry is MenuItem item)
             {
-                bool isHot = i == _hotIndex;
+                bool isHot = i == _hotIndex || i == _openSubMenuIndex;
                 var bg = isHot ? theme.Palette.SelectionBackground.WithAlpha(0.6) : Color.Transparent;
                 if (bg.A > 0)
                 {
@@ -581,7 +742,7 @@ public sealed class ContextMenu : Control, IPopupOwner
                 var fg = item.IsEnabled ? Foreground : theme.Palette.DisabledText;
                 var chevronReserved = item.SubMenu != null ? SubMenuGlyphAreaWidth : 0;
 
-                var paddedRow = row.Deflate(ItemPadding);
+                var paddedRow = layoutRow.Deflate(ItemPadding);
 
                 double textLeft = paddedRow.X;
                 double textRight = paddedRow.Right - chevronReserved;
@@ -606,7 +767,7 @@ public sealed class ContextMenu : Control, IPopupOwner
                 if (item.SubMenu != null)
                 {
                     // Simple submenu chevron indicator.
-                    var cx = paddedRow.Right;
+                    var cx = paddedRow.Right + 3;
                     var cy = paddedRow.Y + paddedRow.Height / 2;
                     context.DrawLine(new Point(cx - 1.5, cy - 3), new Point(cx + 1.5, cy), fg, 1);
                     context.DrawLine(new Point(cx + 1.5, cy), new Point(cx - 1.5, cy + 3), fg, 1);
@@ -618,6 +779,13 @@ public sealed class ContextMenu : Control, IPopupOwner
             {
                 break;
             }
+        }
+
+        context.Restore();
+
+        if (_vBar.IsVisible)
+        {
+            _vBar.Render(context);
         }
     }
 }

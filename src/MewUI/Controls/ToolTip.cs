@@ -33,16 +33,18 @@ public sealed class ToolTip : Control
 
     protected override Size MeasureContent(Size availableSize)
     {
+        var borderInset = GetBorderVisualInset();
+        var border = borderInset > 0 ? new Thickness(borderInset) : Thickness.Zero;
+
         if (string.IsNullOrEmpty(Text))
         {
-            return Padding.HorizontalThickness > 0 || Padding.VerticalThickness > 0
-                ? new Size(Padding.HorizontalThickness, Padding.VerticalThickness)
-                : Size.Empty;
+            return new Size(Padding.HorizontalThickness, Padding.VerticalThickness)
+                .Inflate(border);
         }
 
         using var measure = BeginTextMeasurement();
         var textSize = measure.Context.MeasureText(Text, measure.Font);
-        return textSize.Inflate(Padding);
+        return textSize.Inflate(Padding).Inflate(border);
     }
 
     protected override void OnRender(IGraphicsContext context)
@@ -65,4 +67,3 @@ public sealed class ToolTip : Control
             TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
     }
 }
-

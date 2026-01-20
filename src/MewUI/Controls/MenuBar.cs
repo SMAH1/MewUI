@@ -272,7 +272,14 @@ public sealed class MenuBar : Control, IPopupOwner
 
             if (bg.A > 0)
             {
-                context.FillRectangle(row, bg);
+                if (theme.ControlCornerRadius - 1 is double r && r > 0)
+                {
+                    context.FillRoundedRectangle(row, r, r, bg);
+                }
+                else
+                {
+                    context.FillRectangle(row, bg);
+                }
             }
 
             var fg = item.IsEnabled ? Foreground : theme.Palette.DisabledText;
@@ -282,7 +289,11 @@ public sealed class MenuBar : Control, IPopupOwner
         }
 
         // Simple bottom separator.
-        var lineY = bounds.Bottom - 1;
-        context.DrawLine(new Point(bounds.X, lineY), new Point(bounds.Right, lineY), theme.Palette.ControlBorder, 1);
+        var dpiScale = GetDpi() / 96.0;
+        var onePx = 1.0 / dpiScale;
+        var rect = LayoutRounding.SnapRectEdgesToPixels(
+            new Rect(bounds.X, bounds.Bottom - onePx, Math.Max(0, bounds.Width), onePx),
+            dpiScale);
+        context.FillRectangle(rect, theme.Palette.ControlBorder);
     }
 }
