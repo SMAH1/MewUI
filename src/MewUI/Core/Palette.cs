@@ -92,7 +92,7 @@ public sealed class Palette
         (ScrollBarThumb, ScrollBarThumbHover, ScrollBarThumbActive) = ComputeScrollBarThumbs(windowBackground);
     }
 
-    internal static bool UseAlphaPalette { get; set; } = true;
+    internal static bool UseAlphaPalette { get; set; } = false;
 
     public Palette WithAccent(Color accent, Color? accentText = null)
     {

@@ -30,7 +30,7 @@ public abstract class Control : FrameworkElement, IDisposable
 
     protected virtual FontWeight DefaultFontWeight => Theme.Current.FontWeight;
 
-    internal static bool PreferFillStrokeTrick { get; } = false;
+    internal static bool PreferFillStrokeTrick { get; } = true;
 
     public string? ToolTipText { get; set; }
 
@@ -70,6 +70,11 @@ public abstract class Control : FrameworkElement, IDisposable
         get => _background ?? DefaultBackground;
         set
         {
+            if (Background == value)
+            {
+                return;
+            }
+
             _background = value;
             InvalidateVisual();
         }
@@ -94,6 +99,11 @@ public abstract class Control : FrameworkElement, IDisposable
         get => _foreground ?? DefaultForeground;
         set
         {
+            if (Foreground == value)
+            {
+                return;
+            }
+
             _foreground = value;
             InvalidateVisual();
         }
@@ -118,6 +128,11 @@ public abstract class Control : FrameworkElement, IDisposable
         get => _borderBrush ?? DefaultBorderBrush;
         set
         {
+            if (BorderBrush == value)
+            {
+                return;
+            }
+
             _borderBrush = value;
             InvalidateVisual();
         }
@@ -340,28 +355,9 @@ public abstract class Control : FrameworkElement, IDisposable
     }
 
     /// <summary>
-    /// Gets the graphics factory from the owning window, or the default factory.
-    /// </summary>
-    protected IGraphicsFactory GetGraphicsFactory()
-    {
-        var root = FindVisualRoot();
-        if (root is Window window)
-        {
-            return window.GraphicsFactory;
-        }
-
-        return Application.DefaultGraphicsFactory;
-    }
-
-    /// <summary>
     /// Gets the font using the control's graphics factory.
     /// </summary>
     protected IFont GetFont() => GetFont(GetGraphicsFactory());
-
-    protected uint GetDpi()
-    {
-        return GetDpiCached();
-    }
 
     protected double GetBorderVisualInset()
     {
@@ -381,6 +377,39 @@ public abstract class Control : FrameworkElement, IDisposable
         return LayoutRounding.SnapRectEdgesToPixels(bounds, dpiScale);
     }
 
+    protected readonly struct BorderRenderMetrics
+    {
+        public Rect Bounds { get; }
+
+        public double DpiScale { get; }
+
+        public double BorderThickness { get; }
+
+        public double CornerRadius { get; }
+
+        public BorderRenderMetrics(Rect bounds, double dpiScale, double borderThickness, double cornerRadius)
+        {
+            Bounds = bounds;
+            DpiScale = dpiScale;
+            BorderThickness = borderThickness;
+            CornerRadius = cornerRadius;
+        }
+    }
+
+    protected BorderRenderMetrics GetBorderRenderMetrics(Rect bounds, double cornerRadiusDip, bool snapBounds = true)
+    {
+        var dpiScale = GetDpi() / 96.0;
+        var borderThickness = BorderThickness <= 0 ? 0 : LayoutRounding.SnapThicknessToPixels(BorderThickness, dpiScale, 1);
+        var radius = cornerRadiusDip <= 0 ? 0 : LayoutRounding.RoundToPixel(cornerRadiusDip, dpiScale);
+
+        if (snapBounds)
+        {
+            bounds = LayoutRounding.SnapRectEdgesToPixels(bounds, dpiScale);
+        }
+
+        return new BorderRenderMetrics(bounds, dpiScale, borderThickness, radius);
+    }
+
     protected void DrawBackgroundAndBorder(
         IGraphicsContext context,
         Rect bounds,
@@ -388,11 +417,15 @@ public abstract class Control : FrameworkElement, IDisposable
         Color borderBrush,
         double cornerRadiusDip)
     {
-        var dpiScale = GetDpi() / 96.0;
-        var borderThickness = BorderThickness <= 0 ? 0 : LayoutRounding.SnapThicknessToPixels(BorderThickness, dpiScale, 1);
-        var radius = cornerRadiusDip <= 0 ? 0 : LayoutRounding.RoundToPixel(cornerRadiusDip, dpiScale);
+        if (background.A == 0 && (BorderThickness <= 0 || borderBrush.A == 0))
+        {
+            return;
+        }
 
-        bounds = GetSnappedBorderBounds(bounds);
+        var metrics = GetBorderRenderMetrics(bounds, cornerRadiusDip);
+        bounds = metrics.Bounds;
+        var borderThickness = metrics.BorderThickness;
+        var radius = metrics.CornerRadius;
 
         bool canUseFillStrokeTrick = PreferFillStrokeTrick &&
                                      borderThickness > 0 &&
@@ -458,6 +491,11 @@ public abstract class Control : FrameworkElement, IDisposable
     protected override void OnRender(IGraphicsContext context)
     {
         base.OnRender(context);
+
+        if (Background.A == 0 && (BorderThickness <= 0 || BorderBrush.A == 0))
+        {
+            return;
+        }
 
         DrawBackgroundAndBorder(
             context,
@@ -587,7 +625,8 @@ public abstract class Control : FrameworkElement, IDisposable
         window.ClosePopup(_toolTipPopup);
     }
 
-    protected virtual void OnDispose() { }
+    protected virtual void OnDispose()
+    { }
 
     public void Dispose()
     {

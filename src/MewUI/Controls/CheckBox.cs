@@ -5,6 +5,7 @@ namespace Aprillz.MewUI.Controls;
 public class CheckBox : ToggleBase
 {
     private bool _isPressed;
+    private TextMeasureCache _textMeasureCache;
 
     public CheckBox()
     {
@@ -22,10 +23,11 @@ public class CheckBox : ToggleBase
 
         if (!string.IsNullOrEmpty(Text))
         {
-            using var measure = BeginTextMeasurement();
-            var textSize = measure.Context.MeasureText(Text, measure.Font);
-            width += textSize.Width;
-            height = Math.Max(height, textSize.Height);
+            var factory = GetGraphicsFactory();
+            var font = GetFont(factory);
+            var size = _textMeasureCache.Measure(factory, GetDpi(), font, Text, TextWrapping.NoWrap, 0);
+            width += size.Width;
+            height = Math.Max(height, size.Height);
         }
 
         return new Size(width, height).Inflate(Padding);
@@ -63,9 +65,9 @@ public class CheckBox : ToggleBase
 
         if (!string.IsNullOrEmpty(Text))
         {
-            var font = GetFont();
             var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
             var textBounds = new Rect(contentBounds.X + boxSize + spacing, contentBounds.Y, contentBounds.Width - boxSize - spacing, contentBounds.Height);
+            var font = GetFont();
             context.DrawText(Text, textBounds, font, textColor, TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }
     }
@@ -123,5 +125,16 @@ public class CheckBox : ToggleBase
         base.OnKeyUp(e);
 
         // Space handled by ToggleBase
+    }
+
+    protected override void OnDispose()
+    {
+        base.OnDispose();
+    }
+
+    protected override void OnThemeChanged(Theme oldTheme, Theme newTheme)
+    {
+        base.OnThemeChanged(oldTheme, newTheme);
+        _textMeasureCache.Invalidate();
     }
 }

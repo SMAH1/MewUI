@@ -40,8 +40,10 @@ internal sealed class TabHeaderButton : ContentControl
     protected override void OnRender(IGraphicsContext context)
     {
         var theme = GetTheme();
-        var bounds = GetSnappedBorderBounds(Bounds);
-        double radius = Math.Max(0, theme.ControlCornerRadius);
+        double radiusDip = Math.Max(0, theme.ControlCornerRadius);
+        var metrics = GetBorderRenderMetrics(Bounds, radiusDip);
+        var bounds = metrics.Bounds;
+        var radius = metrics.CornerRadius;
         var state = GetVisualState(_isPressed, _isPressed);
 
         var host = Parent?.Parent as TabControl;
@@ -71,7 +73,8 @@ internal sealed class TabHeaderButton : ContentControl
 
         context.Save();
         context.SetClip(bounds);
-        DrawBackgroundAndBorder(context, rounded, bg, border, radius);
+        // Use fill-based border (outer + inner) to avoid stroke centering being clipped by the tight clip.
+        DrawBackgroundAndBorder(context, rounded, bg, border, radiusDip);
 
         context.Restore();
     }

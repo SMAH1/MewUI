@@ -15,7 +15,7 @@ public sealed class ScrollViewer : ContentControl
     private readonly ScrollBar _vBar;
     private readonly ScrollBar _hBar;
     private readonly ScrollController _scroll = new();
-
+     
     private Size _extent = Size.Empty;
     private Size _viewport = Size.Empty;
 
@@ -316,8 +316,8 @@ public sealed class ScrollViewer : ContentControl
             e.Handled = true;
         }
     }
-
-    void IVisualTreeHost.VisitChildren(Action<Element> visitor)
+    
+     void IVisualTreeHost.VisitChildren(Action<Element> visitor)
     {
         if (Content != null)
         {

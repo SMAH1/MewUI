@@ -28,8 +28,7 @@ public sealed class GroupBox : HeaderedContentControl
 
     protected override Size MeasureContent(Size availableSize)
     {
-        var borderInset = GetBorderVisualInset();
-        var border = borderInset > 0 ? new Thickness(borderInset) : Thickness.Zero;
+        var border = BorderThickness > 0 ? new Thickness(BorderThickness) : Thickness.Zero;
         var padding = Padding;
         double headerHeight = 0;
         double headerWidth = 0;
@@ -71,7 +70,6 @@ public sealed class GroupBox : HeaderedContentControl
 
     protected override void ArrangeContent(Rect bounds)
     {
-        var borderInset = GetBorderVisualInset();
         var outer = bounds;
         double boxTop = outer.Y;
 
@@ -94,7 +92,8 @@ public sealed class GroupBox : HeaderedContentControl
         double spacing = (Header != null && Content != null) ? Math.Max(0, HeaderSpacing) : 0;
         double boxY = boxTop + spacing;
         var boxRect = new Rect(outer.X, boxY, outer.Width, Math.Max(0, outer.Bottom - boxY));
-        var innerBox = boxRect.Deflate(new Thickness(borderInset)).Deflate(Padding);
+        var border = BorderThickness > 0 ? new Thickness(BorderThickness) : Thickness.Zero;
+        var innerBox = boxRect.Deflate(border).Deflate(Padding);
 
         if (Content != null)
         {
@@ -105,8 +104,7 @@ public sealed class GroupBox : HeaderedContentControl
     protected override void OnRender(IGraphicsContext context)
     {
         var theme = GetTheme();
-        var bounds = GetSnappedBorderBounds(Bounds);
-        var borderInset = GetBorderVisualInset();
+        var bounds = GetBorderRenderMetrics(Bounds, 0).Bounds;
         if (bounds.Width <= 0 || bounds.Height <= 0)
         {
             return;

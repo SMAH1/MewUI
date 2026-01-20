@@ -5,6 +5,7 @@ namespace Aprillz.MewUI.Controls;
 public sealed class ComboBox : Control, IPopupOwner
 {
     private readonly List<string> _items = new();
+    private readonly TextWidthCache _textWidthCache = new(512);
     private bool _isDropDownOpen;
     private ListBox? _popupList;
     private bool _restoreFocusAfterPopupClose;
@@ -123,10 +124,13 @@ public sealed class ComboBox : Control, IPopupOwner
     {
         var headerHeight = ResolveHeaderHeight();
         double width = 80;
+        var dpi = GetDpi();
 
         using (var measure = BeginTextMeasurement())
         {
             double maxWidth = 0;
+            _textWidthCache.SetCapacity(Math.Clamp(_items.Count + 8, 64, 4096));
+
             foreach (var item in _items)
             {
                 if (string.IsNullOrEmpty(item))
@@ -134,12 +138,12 @@ public sealed class ComboBox : Control, IPopupOwner
                     continue;
                 }
 
-                maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width);
+                maxWidth = Math.Max(maxWidth, _textWidthCache.GetOrMeasure(measure.Context, measure.Font, dpi, item));
             }
 
             if (!string.IsNullOrEmpty(Placeholder))
             {
-                maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(Placeholder, measure.Font).Width);
+                maxWidth = Math.Max(maxWidth, _textWidthCache.GetOrMeasure(measure.Context, measure.Font, dpi, Placeholder));
             }
 
             width = maxWidth + Padding.HorizontalThickness + ArrowAreaWidth;

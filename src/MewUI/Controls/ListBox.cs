@@ -5,6 +5,7 @@ namespace Aprillz.MewUI.Controls;
 public class ListBox : Control
 {
     private readonly List<string> _items = new();
+    private readonly TextWidthCache _textWidthCache = new(512);
     private ValueBinding<int>? _selectedIndexBinding;
     private bool _updatingFromSource;
     private readonly ScrollBar _vBar;
@@ -124,6 +125,7 @@ public class ListBox : Control
     {
         var theme = GetTheme();
         var borderInset = GetBorderVisualInset();
+        var dpi = GetDpi();
         double widthLimit = double.IsPositiveInfinity(availableSize.Width)
             ? double.PositiveInfinity
             : Math.Max(0, availableSize.Width - Padding.HorizontalThickness - borderInset * 2);
@@ -154,6 +156,7 @@ public class ListBox : Control
                 int visibleEstimate = itemHeightEstimate <= 0 ? _items.Count : (int)Math.Ceiling(viewportEstimate / itemHeightEstimate) + 1;
                 int sampleCount = Math.Clamp(visibleEstimate, 32, 256);
                 sampleCount = Math.Min(sampleCount, _items.Count);
+                _textWidthCache.SetCapacity(Math.Clamp(visibleEstimate * 4, 256, 4096));
                 double itemPadW = ItemPadding.HorizontalThickness;
 
                 for (int i = 0; i < sampleCount; i++)
@@ -164,7 +167,7 @@ public class ListBox : Control
                         continue;
                     }
 
-                    maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width + itemPadW);
+                    maxWidth = Math.Max(maxWidth, _textWidthCache.GetOrMeasure(measure.Context, measure.Font, dpi, item) + itemPadW);
                     if (maxWidth >= widthLimit)
                     {
                         maxWidth = widthLimit;
@@ -178,12 +181,13 @@ public class ListBox : Control
                     var item = _items[SelectedIndex];
                     if (!string.IsNullOrEmpty(item))
                     {
-                        maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width + itemPadW);
+                        maxWidth = Math.Max(maxWidth, _textWidthCache.GetOrMeasure(measure.Context, measure.Font, dpi, item) + itemPadW);
                     }
                 }
             }
             else
             {
+                _textWidthCache.SetCapacity(Math.Clamp(_items.Count, 64, 4096));
                 double itemPadW = ItemPadding.HorizontalThickness;
                 foreach (var item in _items)
                 {
@@ -192,7 +196,7 @@ public class ListBox : Control
                         continue;
                     }
 
-                    maxWidth = Math.Max(maxWidth, measure.Context.MeasureText(item, measure.Font).Width + itemPadW);
+                    maxWidth = Math.Max(maxWidth, _textWidthCache.GetOrMeasure(measure.Context, measure.Font, dpi, item) + itemPadW);
                     if (maxWidth >= widthLimit)
                     {
                         maxWidth = widthLimit;
@@ -342,8 +346,8 @@ public class ListBox : Control
             }
 
             var textColor = selected ? theme.Palette.SelectionText : (IsEnabled ? Foreground : theme.Palette.DisabledText);
-            context.DrawText(_items[i] ?? string.Empty, itemRect.Deflate(ItemPadding), font, textColor,
-                TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
+            var textBounds = itemRect.Deflate(ItemPadding);
+            context.DrawText(_items[i] ?? string.Empty, textBounds, font, textColor, TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
         }
 
         context.Restore();

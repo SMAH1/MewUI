@@ -17,7 +17,6 @@ public class Window : ContentControl
 {
     private readonly DispatcherMergeKey _layoutMergeKey = new(UiDispatcherPriority.Layout);
     private readonly DispatcherMergeKey _renderMergeKey = new(UiDispatcherPriority.Render);
-    private bool _paintPending;
 
     private Theme _theme = Theme.Current;
     private IWindowBackend? _backend;
@@ -404,12 +403,11 @@ public class Window : ContentControl
 
     private void InvalidateBackend()
     {
-        if (_backend == null || _paintPending)
+        if (_backend == null)
         {
             return;
         }
 
-        _paintPending = true;
         _backend.Invalidate(true);
     }
 
@@ -524,8 +522,6 @@ public class Window : ContentControl
 
     internal void RenderFrame(nint hdc)
     {
-        _paintPending = false;
-
         // Some platforms can render before Loaded is raised due to Run/Show/Dispatcher ordering.
         // Ensure Loaded is raised as soon as the dispatcher is available, and always before FirstFrameRendered.
         if (!_loadedRaised && Application.IsRunning && Application.Current.Dispatcher != null)

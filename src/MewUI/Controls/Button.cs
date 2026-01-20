@@ -10,6 +10,7 @@ public class Button : Control
     private bool _isPressed;
     private ValueBinding<string>? _contentBinding;
     private Func<bool>? _canClick;
+    private TextMeasureCache _textMeasureCache;
 
     protected override Color DefaultBackground => Theme.Current.Palette.ButtonFace;
     protected override Color DefaultBorderBrush => Theme.Current.Palette.ControlBorder;
@@ -37,7 +38,18 @@ public class Button : Control
     public string Content
     {
         get;
-        set { field = value ?? string.Empty; InvalidateMeasure(); }
+        set
+        {
+            value ??= string.Empty;
+            if (field == value)
+            {
+                return;
+            }
+
+            field = value;
+            _textMeasureCache.Invalidate();
+            InvalidateMeasure();
+        }
     } = string.Empty;
 
     /// <summary>
@@ -61,25 +73,25 @@ public class Button : Control
 
     protected override Size MeasureContent(Size availableSize)
     {
-        var borderInset = GetBorderVisualInset();
-        var border = borderInset > 0 ? new Thickness(borderInset) : Thickness.Zero;
-
+        // Keep the previous fallback sizing behavior for empty content.
         if (string.IsNullOrEmpty(Content))
         {
+            var borderInset = GetBorderVisualInset();
+            var border = borderInset > 0 ? new Thickness(borderInset) : Thickness.Zero;
             return new Size(Padding.HorizontalThickness + 20, Padding.VerticalThickness + 10).Inflate(border);
         }
 
-        using var measure = BeginTextMeasurement();
-        var textSize = measure.Context.MeasureText(Content, measure.Font);
-
-        return textSize.Inflate(Padding).Inflate(border);
+        var factory = GetGraphicsFactory();
+        var font = GetFont(factory);
+        var size = _textMeasureCache.Measure(factory, GetDpi(), font, Content, TextWrapping.NoWrap, 0);
+        var borderInset2 = GetBorderVisualInset();
+        var border2 = borderInset2 > 0 ? new Thickness(borderInset2) : Thickness.Zero;
+        return size.Inflate(Padding).Inflate(border2);
     }
 
     protected override void OnRender(IGraphicsContext context)
     {
         var theme = GetTheme();
-        var bounds = GetSnappedBorderBounds(Bounds);
-        double radius = theme.ControlCornerRadius;
         var state = GetVisualState(_isPressed, _isPressed);
 
         // Determine visual state
@@ -103,6 +115,8 @@ public class Button : Control
             bgColor = Background;
         }
 
+        var bounds = GetSnappedBorderBounds(Bounds);
+        double radius = theme.ControlCornerRadius;
         DrawBackgroundAndBorder(context, bounds, bgColor, borderColor, radius);
 
         // Draw text
@@ -111,9 +125,7 @@ public class Button : Control
             var contentBounds = bounds.Deflate(Padding).Deflate(new Thickness(GetBorderVisualInset()));
             var font = GetFont();
             var textColor = state.IsEnabled ? Foreground : theme.Palette.DisabledText;
-
-            context.DrawText(Content, contentBounds, font, textColor,
-                TextAlignment.Center, TextAlignment.Center, TextWrapping.NoWrap);
+            context.DrawText(Content, contentBounds, font, textColor, TextAlignment.Center, TextAlignment.Center, TextWrapping.NoWrap);
         }
     }
 

@@ -12,6 +12,18 @@ public abstract class Panel : Control
 
     protected override bool InvalidateOnMouseOverChanged => false;
 
+    protected override void OnRender(IGraphicsContext context)
+    {
+        // Panels typically don't render anything. Avoid calling into Control.OnRender unless
+        // background/border are actually visible (Panel still supports them when explicitly set).
+        if (Background.A == 0 && (BorderThickness <= 0 || BorderBrush.A == 0))
+        {
+            return;
+        }
+
+        base.OnRender(context);
+    }
+
     /// <summary>
     /// Gets the collection of child elements.
     /// </summary>

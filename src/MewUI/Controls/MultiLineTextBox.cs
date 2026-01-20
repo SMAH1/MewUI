@@ -456,7 +456,7 @@ public sealed class MultiLineTextBox : TextBase
 
         (int start, int end) selection = default;
         bool canDrawCaret = IsFocused && IsEnabled;
-        bool canDrawSelection = IsFocused && HasSelection;
+        bool canDrawSelection = HasSelection;
         if (canDrawSelection)
         {
             selection = GetSelectionRange();
@@ -848,7 +848,7 @@ public sealed class MultiLineTextBox : TextBase
         double xBase,
         MultiLineTextView.CachedLineMeasure? fullLineMeasure = null)
     {
-        if (!IsFocused || !HasSelection || rowText.IsEmpty)
+        if (!HasSelection || rowText.IsEmpty)
         {
             return;
         }

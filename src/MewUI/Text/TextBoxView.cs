@@ -72,7 +72,7 @@ internal sealed class TextBoxView
 
         var visible = text[startCol..endCol];
 
-        if (isFocused && hasSelection)
+        if (hasSelection)
         {
             int s = Math.Max(selectionStart, startCol);
             int t = Math.Min(selectionEnd, endCol);

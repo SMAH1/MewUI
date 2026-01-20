@@ -1,10 +1,28 @@
 namespace Aprillz.MewUI.Controls;
 
+using Aprillz.MewUI.Rendering;
+
 /// <summary>
 /// Base class for elements with size, margin, alignment, and data binding support.
 /// </summary>
 public abstract class FrameworkElement : UIElement
 {
+    /// <summary>
+    /// Gets the graphics factory from the owning window, or the default factory.
+    /// </summary>
+    protected IGraphicsFactory GetGraphicsFactory()
+    {
+        var root = FindVisualRoot();
+        if (root is Window window)
+        {
+            return window.GraphicsFactory;
+        }
+
+        return Application.DefaultGraphicsFactory;
+    }
+
+    protected uint GetDpi() => GetDpiCached();
+
     /// <summary>
     /// Gets or sets the explicit width. Use double.NaN for automatic sizing.
     /// </summary>

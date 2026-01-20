@@ -8,24 +8,8 @@ namespace Aprillz.MewUI.Controls;
 public class Label : Control
 {
     private ValueBinding<string>? _textBinding;
+    private TextMeasureCache _textMeasureCache;
     protected override bool InvalidateOnMouseOverChanged => false;
-    private TextMeasureKey _lastMeasureKey;
-    private Size _lastMeasuredTextSize;
-    private bool _hasMeasuredText;
-
-    private readonly record struct TextMeasureKey(
-        string Text,
-        IFont Font,
-        TextWrapping Wrapping,
-        double MaxWidthDip,
-        uint Dpi);
-
-    private void InvalidateTextMeasure()
-    {
-        _lastMeasureKey = default;
-        _lastMeasuredTextSize = default;
-        _hasMeasuredText = false;
-    }
 
     /// <summary>
     /// Gets or sets the text content.
@@ -42,7 +26,7 @@ public class Label : Control
             }
 
             field = value;
-            InvalidateTextMeasure();
+            _textMeasureCache.Invalidate();
             InvalidateMeasure();
         }
     } = string.Empty;
@@ -53,7 +37,11 @@ public class Label : Control
     public TextAlignment TextAlignment
     {
         get;
-        set { field = value; InvalidateVisual(); }
+        set
+        {
+            field = value;
+            InvalidateVisual();
+        }
     } = TextAlignment.Left;
 
     /// <summary>
@@ -62,7 +50,11 @@ public class Label : Control
     public TextAlignment VerticalTextAlignment
     {
         get;
-        set { field = value; InvalidateVisual(); }
+        set
+        {
+            field = value;
+            InvalidateVisual();
+        }
     } = TextAlignment.Top;
 
     /// <summary>
@@ -73,8 +65,13 @@ public class Label : Control
         get;
         set
         {
+            if (field == value)
+            {
+                return;
+            }
+
             field = value;
-            InvalidateTextMeasure();
+            _textMeasureCache.Invalidate();
             InvalidateMeasure();
         }
     } = TextWrapping.NoWrap;
@@ -98,24 +95,9 @@ public class Label : Control
 
         var factory = GetGraphicsFactory();
         var font = GetFont(factory);
-        var dpi = GetDpi();
 
         double maxWidth = 0;
-        if (wrapping == TextWrapping.NoWrap)
-        {
-            var key = new TextMeasureKey(Text, font, wrapping, 0, dpi);
-            if (_hasMeasuredText && key == _lastMeasureKey)
-            {
-                return _lastMeasuredTextSize.Inflate(Padding);
-            }
-
-            using var ctx = factory.CreateMeasurementContext(dpi);
-            _lastMeasuredTextSize = ctx.MeasureText(Text, font);
-            _lastMeasureKey = key;
-            _hasMeasuredText = true;
-            return _lastMeasuredTextSize.Inflate(Padding);
-        }
-        else
+        if (wrapping != TextWrapping.NoWrap)
         {
             maxWidth = availableSize.Width - Padding.HorizontalThickness;
             if (double.IsNaN(maxWidth) || maxWidth <= 0)
@@ -123,26 +105,16 @@ public class Label : Control
                 maxWidth = 0;
             }
 
-            // Avoid passing infinity into backend implementations that convert to int pixel widths.
             if (double.IsPositiveInfinity(maxWidth))
             {
                 maxWidth = 1_000_000;
             }
 
             maxWidth = maxWidth > 0 ? maxWidth : 1_000_000;
-
-            var key = new TextMeasureKey(Text, font, wrapping, maxWidth, dpi);
-            if (_hasMeasuredText && key == _lastMeasureKey)
-            {
-                return _lastMeasuredTextSize.Inflate(Padding);
-            }
-
-            using var ctx = factory.CreateMeasurementContext(dpi);
-            _lastMeasuredTextSize = ctx.MeasureText(Text, font, maxWidth);
-            _lastMeasureKey = key;
-            _hasMeasuredText = true;
-            return _lastMeasuredTextSize.Inflate(Padding);
         }
+
+        var size = _textMeasureCache.Measure(factory, GetDpi(), font, Text, wrapping, maxWidth);
+        return size.Inflate(Padding);
     }
 
     protected override void OnRender(IGraphicsContext context)
@@ -159,17 +131,15 @@ public class Label : Control
             return;
         }
 
-        var contentBounds = Bounds.Deflate(Padding);
-        var font = GetFont();
-
         var wrapping = TextWrapping;
         if (wrapping == TextWrapping.NoWrap && HasExplicitLineBreaks)
         {
             wrapping = TextWrapping.Wrap;
         }
 
-        context.DrawText(Text, contentBounds, font, Foreground,
-            TextAlignment, VerticalTextAlignment, wrapping);
+        var bounds = Bounds.Deflate(Padding);
+        var font = GetFont();
+        context.DrawText(Text, bounds, font, Foreground, TextAlignment, VerticalTextAlignment, wrapping);
     }
 
     public void SetTextBinding(Func<string> get, Action<Action>? subscribe = null, Action<Action>? unsubscribe = null)
@@ -202,15 +172,9 @@ public class Label : Control
         _textBinding = null;
     }
 
-    protected override void OnDpiChanged(uint oldDpi, uint newDpi)
-    {
-        InvalidateTextMeasure();
-        base.OnDpiChanged(oldDpi, newDpi);
-    }
-
     protected override void OnThemeChanged(Theme oldTheme, Theme newTheme)
     {
-        InvalidateTextMeasure();
         base.OnThemeChanged(oldTheme, newTheme);
+        _textMeasureCache.Invalidate();
     }
 }

@@ -122,6 +122,37 @@ public sealed class TabControl : Control
         _contentHost.Parent = this;
     }
 
+    protected override void OnDpiChanged(uint oldDpi, uint newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+
+        // Tab contents are detached from the visual tree when not selected.
+        // Window DPI broadcasts won't reach them, so their cached fonts/measures can remain stale.
+        var selectedContent = _contentHost.Content;
+        for (int i = 0; i < _tabs.Count; i++)
+        {
+            var content = _tabs[i].Content;
+            if (content == null || ReferenceEquals(content, selectedContent))
+            {
+                continue;
+            }
+
+            VisualTree.Visit(content, element =>
+            {
+                element.ClearDpiCache();
+
+                if (element is Control control)
+                {
+                    control.NotifyDpiChanged(oldDpi, newDpi);
+                }
+                else
+                {
+                    element.InvalidateMeasure();
+                }
+            });
+        }
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
