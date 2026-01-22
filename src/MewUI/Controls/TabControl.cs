@@ -130,7 +130,7 @@ public sealed class TabControl : Control
         for (int i = 0; i < _tabs.Count; i++)
         {
             var content = _tabs[i].Content;
-            if (content == null || ReferenceEquals(content, selectedContent))
+            if (content == null || content == selectedContent)
             {
                 continue;
             }
@@ -146,6 +146,32 @@ public sealed class TabControl : Control
                 else
                 {
                     element.InvalidateMeasure();
+                }
+            });
+        }
+    }
+
+    protected override void OnThemeChanged(Theme oldTheme, Theme newTheme)
+    {
+        base.OnThemeChanged(oldTheme, newTheme);
+        // Tab contents are detached from the visual tree when not selected.
+        // Window DPI broadcasts won't reach them, so their cached fonts/measures can remain stale.
+        var selectedContent = _contentHost.Content;
+        for (int i = 0; i < _tabs.Count; i++)
+        {
+            var content = _tabs[i].Content;
+            if (content == null || content == selectedContent)
+            {
+                continue;
+            }
+
+            VisualTree.Visit(content, element =>
+            {
+                element.ClearDpiCache();
+
+                if (element is FrameworkElement control)
+                {
+                    control.NotifyThemeChanged(oldTheme, newTheme);
                 }
             });
         }
@@ -308,7 +334,6 @@ public sealed class TabControl : Control
         var theme = GetTheme();
         var bounds = GetSnappedBorderBounds(Bounds);
         var borderInset = GetBorderVisualInset();
-        var inner = bounds.Deflate(new Thickness(borderInset));
 
         double headerH = _headerStrip.Bounds.Height;
         if (headerH <= 0)
@@ -319,12 +344,13 @@ public sealed class TabControl : Control
         var stripBg = GetTabStripBackground(theme);
         var contentBg = theme.Palette.ContainerBackground;
 
-        var headerRect = new Rect(inner.X, inner.Y, inner.Width, Math.Max(0, headerH));
+        var headerRect = new Rect(bounds.X, bounds.Y, bounds.Width, Math.Max(0, headerH));
+
         var contentRect = new Rect(
-            inner.X,
-            inner.Y + headerRect.Height + borderInset,
-            inner.Width,
-            Math.Max(0, inner.Height - headerRect.Height + theme.ControlCornerRadius - borderInset));
+            bounds.X,
+            bounds.Y + headerRect.Height + borderInset,
+            bounds.Width,
+            Math.Max(0, bounds.Height - headerRect.Height + theme.ControlCornerRadius - borderInset));
 
 
         var outline = GetOutlineColor(theme);

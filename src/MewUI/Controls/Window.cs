@@ -381,7 +381,7 @@ public class Window : ContentControl
         // client size hasn't changed, avoid re-running Measure/Arrange on every paint.
         if (clientSize == _lastLayoutClientSizeDip &&
             padding == _lastLayoutPadding &&
-            ReferenceEquals(Content, _lastLayoutContent) &&
+            Content == _lastLayoutContent &&
             !IsLayoutDirty(Content))
         {
             return;
@@ -719,7 +719,7 @@ public class Window : ContentControl
         {
             VisitVisualTree(Content, e =>
             {
-                if (e is Control c)
+                if (e is FrameworkElement c)
                 {
                     c.NotifyThemeChanged(oldTheme, newTheme);
                 }
