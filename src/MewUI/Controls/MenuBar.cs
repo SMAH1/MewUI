@@ -290,9 +290,9 @@ public sealed class MenuBar : Control, IPopupOwner
 
         // Simple bottom separator.
         var dpiScale = GetDpi() / 96.0;
-        var onePx = 1.0 / dpiScale;
-        var rect = LayoutRounding.SnapRectEdgesToPixels(
-            new Rect(bounds.X, bounds.Bottom - onePx, Math.Max(0, bounds.Width), onePx),
+        var thickness = LayoutRounding.SnapThicknessToPixels(1.0 / dpiScale, dpiScale, 1);
+        var rect = LayoutRounding.SnapBoundsRectToPixels(
+            new Rect(bounds.X, bounds.Bottom - thickness, Math.Max(0, bounds.Width), thickness),
             dpiScale);
         context.FillRectangle(rect, theme.Palette.ControlBorder);
     }

@@ -365,7 +365,7 @@ public abstract class Control : FrameworkElement, IDisposable
     protected Rect GetSnappedBorderBounds(Rect bounds)
     {
         var dpiScale = GetDpi() / 96.0;
-        return LayoutRounding.SnapRectEdgesToPixels(bounds, dpiScale);
+        return LayoutRounding.SnapBoundsRectToPixels(bounds, dpiScale);
     }
 
     protected readonly struct BorderRenderMetrics
@@ -395,7 +395,7 @@ public abstract class Control : FrameworkElement, IDisposable
 
         if (snapBounds)
         {
-            bounds = LayoutRounding.SnapRectEdgesToPixels(bounds, dpiScale);
+            bounds = LayoutRounding.SnapBoundsRectToPixels(bounds, dpiScale);
         }
 
         return new BorderRenderMetrics(bounds, dpiScale, borderThickness, radius);

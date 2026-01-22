@@ -13,7 +13,7 @@ public class HeaderedContentControl : ContentControl
         get;
         set
         {
-            if (ReferenceEquals(field, value))
+            if (field == value)
             {
                 return;
             }

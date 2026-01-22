@@ -29,7 +29,7 @@ public sealed class Border : Control, IVisualTreeHost
         get => _child;
         set
         {
-            if (ReferenceEquals(_child, value))
+            if (_child == value)
             {
                 return;
             }

@@ -118,13 +118,13 @@ public sealed class Application
             }
 
             // Keep existing code working, but prefer enum configuration.
-            if (ReferenceEquals(value, Direct2DGraphicsFactory.Instance))
+            if (value == Direct2DGraphicsFactory.Instance)
             {
                 DefaultGraphicsBackend = GraphicsBackend.Direct2D;
                 return;
             }
 
-            if (ReferenceEquals(value, GdiGraphicsFactory.Instance))
+            if (value == GdiGraphicsFactory.Instance)
             {
                 DefaultGraphicsBackend = GraphicsBackend.Gdi;
                 return;

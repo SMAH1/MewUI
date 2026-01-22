@@ -250,13 +250,13 @@ public sealed class ScrollBar : RangeBase
             double x = bounds.X + pad;
             double y = bounds.Y + pad;
             double h = Math.Max(0, bounds.Height - pad * 2);
-            return LayoutRounding.SnapRectEdgesToPixels(new Rect(x, y, visual, h), dpiScale);
+            return LayoutRounding.SnapBoundsRectToPixels(new Rect(x, y, visual, h), dpiScale);
         }
 
         double y0 = bounds.Y + pad;
         double x0 = bounds.X + pad;
         double w = Math.Max(0, bounds.Width - pad * 2);
-        return LayoutRounding.SnapRectEdgesToPixels(new Rect(x0, y0, w, visual), dpiScale);
+        return LayoutRounding.SnapBoundsRectToPixels(new Rect(x0, y0, w, visual), dpiScale);
     }
 
     private Rect GetThumbHitRect(Rect thumbVisual, Rect hitBounds)

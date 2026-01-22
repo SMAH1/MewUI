@@ -608,7 +608,8 @@ public class Window : ContentControl
         // Ensure nothing paints outside the client area.
         var clientSize = _clientSizeDip.IsEmpty ? new Size(Width, Height) : _clientSizeDip;
         context.Save();
-        context.SetClip(new Rect(0, 0, clientSize.Width, clientSize.Height));
+        // Clip should not shrink due to edge rounding; snap outward to avoid 1px clipping at non-100% DPI.
+        context.SetClip(LayoutRounding.SnapViewportRectToPixels(new Rect(0, 0, clientSize.Width, clientSize.Height), DpiScale));
 
         try
         {

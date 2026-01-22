@@ -20,7 +20,6 @@ public sealed class ContextMenu : Control, IPopupOwner
     private double _maxTextWidth;
     private double _maxShortcutWidth;
     private bool _hasAnyShortcut;
-    private Thickness? _itemPadding;
 
     public Menu Menu => _menu;
 
@@ -34,8 +33,8 @@ public sealed class ContextMenu : Control, IPopupOwner
 
     public Thickness ItemPadding
     {
-        get => _itemPadding ??= GetTheme().ListItemPadding;
-        set { _itemPadding = value; InvalidateMeasure(); InvalidateVisual(); }
+        get;
+        set { field = value; InvalidateMeasure(); InvalidateVisual(); }
     }
 
     public double MaxMenuHeight
@@ -62,6 +61,10 @@ public sealed class ContextMenu : Control, IPopupOwner
         if (menu.ItemPadding is Thickness itemPadding)
         {
             ItemPadding = itemPadding;
+        }
+        else
+        {
+            ItemPadding = GetTheme().ListItemPadding;
         }
         BorderThickness = 1;
         Padding = new Thickness(1);
@@ -216,7 +219,8 @@ public sealed class ContextMenu : Control, IPopupOwner
         var dpiScale = GetDpi() / 96.0;
         var borderInset = GetBorderVisualInset();
         var innerBounds = bounds.Deflate(new Thickness(borderInset));
-        return LayoutRounding.SnapRectEdgesToPixels(innerBounds.Deflate(Padding), dpiScale);
+        // Viewport/clip rect should not shrink due to edge rounding; snap outward.
+        return LayoutRounding.SnapViewportRectToPixels(innerBounds.Deflate(Padding), dpiScale);
     }
 
     private Rect GetItemViewportBounds()
@@ -229,7 +233,7 @@ public sealed class ContextMenu : Control, IPopupOwner
 
         var dpiScale = GetDpi() / 96.0;
         double t = GetTheme().ScrollBarHitThickness;
-        return LayoutRounding.SnapRectEdgesToPixels(new Rect(
+        return LayoutRounding.SnapViewportRectToPixels(new Rect(
             contentBounds.X,
             contentBounds.Y,
             Math.Max(0, contentBounds.Width - t),
@@ -317,7 +321,8 @@ public sealed class ContextMenu : Control, IPopupOwner
         var borderInset = GetBorderVisualInset();
         var dpiScale = GetDpi() / 96.0;
         var innerBounds = snapped.Deflate(new Thickness(borderInset));
-        var contentBounds = LayoutRounding.SnapRectEdgesToPixels(innerBounds.Deflate(Padding), dpiScale);
+        // Viewport/clip rect should not shrink due to edge rounding; snap outward.
+        var contentBounds = LayoutRounding.SnapViewportRectToPixels(innerBounds.Deflate(Padding), dpiScale);
         _viewportHeight = Math.Max(0, contentBounds.Height);
 
         bool needV = _extentHeight > _viewportHeight + 0.5;
@@ -695,7 +700,7 @@ public sealed class ContextMenu : Control, IPopupOwner
         var font = measure.Font;
 
         context.Save();
-        context.SetClip(LayoutRounding.ExpandClipByDevicePixels(contentBounds, dpiScale));
+        context.SetClip(LayoutRounding.MakeClipRect(contentBounds, dpiScale));
 
         double barOverlayWidth = _vBar.IsVisible ? theme.ScrollBarHitThickness : 0;
         double y = contentBounds.Y - _verticalOffset;

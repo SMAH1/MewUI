@@ -28,7 +28,9 @@ public sealed class GroupBox : HeaderedContentControl
 
     protected override Size MeasureContent(Size availableSize)
     {
-        var border = BorderThickness > 0 ? new Thickness(BorderThickness) : Thickness.Zero;
+        var borderInset = GetBorderVisualInset();
+
+        var border = borderInset > 0 ? new Thickness(borderInset) : Thickness.Zero;
         var padding = Padding;
         double headerHeight = 0;
         double headerWidth = 0;

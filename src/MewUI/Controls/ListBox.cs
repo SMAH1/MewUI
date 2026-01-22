@@ -78,7 +78,8 @@ public class ListBox : Control
         var dpiScale = GetDpi() / 96.0;
         var innerBounds = bounds.Deflate(new Thickness(GetBorderVisualInset()));
         var viewportBounds = innerBounds;
-        var contentBounds = LayoutRounding.SnapRectEdgesToPixels(viewportBounds.Deflate(Padding), dpiScale);
+        // Viewport/clip rect should not shrink due to edge rounding; snap outward.
+        var contentBounds = LayoutRounding.SnapViewportRectToPixels(viewportBounds.Deflate(Padding), dpiScale);
 
         double itemHeight = ResolveItemHeight();
         if (itemHeight <= 0)
@@ -311,10 +312,11 @@ public class ListBox : Control
         var innerBounds = bounds.Deflate(new Thickness(borderInset));
         var viewportBounds = innerBounds;
 
-        var contentBounds = LayoutRounding.SnapRectEdgesToPixels(viewportBounds.Deflate(Padding), dpiScale);
+        // Viewport/clip rect should not shrink due to edge rounding; snap outward.
+        var contentBounds = LayoutRounding.SnapViewportRectToPixels(viewportBounds.Deflate(Padding), dpiScale);
 
         context.Save();
-        context.SetClip(LayoutRounding.ExpandClipByDevicePixels(contentBounds, dpiScale));
+        context.SetClip(LayoutRounding.MakeClipRect(contentBounds, dpiScale));
 
         var font = GetFont();
         double itemHeight = ResolveItemHeight();

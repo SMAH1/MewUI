@@ -136,7 +136,7 @@ public sealed class ScrollViewer : ContentControl
             double viewportW0 = Math.Max(0, slotW - Padding.HorizontalThickness - (reserveW > 0 ? reserveW / dpiScale : 0));
             double viewportH0 = Math.Max(0, slotH - Padding.VerticalThickness - (reserveH > 0 ? reserveH / dpiScale : 0));
 
-            var viewportRect = LayoutRounding.SnapRectEdgesToPixels(new Rect(0, 0, viewportW0, viewportH0), dpiScale);
+            var viewportRect = LayoutRounding.SnapConstraintRectToPixels(new Rect(0, 0, viewportW0, viewportH0), dpiScale);
             _viewport = viewportRect.Size;
 
             var measureSize = new Size(
@@ -400,39 +400,30 @@ public sealed class ScrollViewer : ContentControl
         }
     }
 
-    private Rect GetViewportBounds(Rect bounds, double borderInset)
-        => GetSnappedBorderBounds(bounds).Deflate(Padding).Deflate(new Thickness(borderInset));
-
     private Rect GetChromeBounds(Rect bounds, double borderInset)
-        => GetSnappedBorderBounds(bounds).Deflate(new Thickness(borderInset));
+    {
+        // Avoid using GetSnappedBorderBounds here: it rounds edges and can shift the viewport by 1px at fractional DPI.
+        // For scroll chrome/viewport we prefer outward snapping so the clip never shrinks.
+        var chrome = bounds.Deflate(new Thickness(borderInset));
+        return LayoutRounding.SnapViewportRectToPixels(chrome, DpiScale);
+    }
 
     private Rect GetContentViewportBounds(Rect bounds, double borderInset)
     {
-        // Content viewport reserves space for bars (they should not overlap content).
-        var theme = GetTheme();
-        var dpiScale = GetDpi() / 96.0;
-        double t = theme.ScrollBarHitThickness;
-
-        var viewport = GetChromeBounds(bounds, borderInset).Deflate(Padding);
-        if (_vBar.IsVisible)
-        {
-            viewport = viewport.Deflate(new Thickness(0, 0, t, 0));
-        }
-
-        if (_hBar.IsVisible)
-        {
-            viewport = viewport.Deflate(new Thickness(0, 0, 0, t));
-        }
-
-        // Clip should never be smaller than the available content area; rounding both edges can shrink by 1px.
-        return LayoutRounding.SnapRectEdgesToPixelsOutward(viewport, dpiScale);
+        var viewport = bounds.Deflate(new Thickness(borderInset)).Deflate(Padding);
+        return LayoutRounding.SnapViewportRectToPixels(viewport, DpiScale);
     }
 
     private Rect GetContentClipBounds(Rect viewport)
     {
-        // Expand the clip by 1 device pixel on the right/bottom so 1px strokes at the edge
-        // (which can render half-outside the logical bounds) don't get clipped.
-        return LayoutRounding.ExpandClipByDevicePixels(viewport, DpiScale);
+        // At fractional DPI (e.g. 150%), many primitives draw strokes centered on the edge of their bounds.
+        // When a child is aligned exactly on the viewport edge, the stroke can overhang by ~0.5px and get clipped.
+        //
+        // Expand the clip by 1 device pixel horizontally into the ScrollViewer padding so borders/glyph overhang
+        // don't get cut, while still keeping the clip strict against the chrome/border areas.
+        var onePx = 1.0 / DpiScale;
+        var expanded = new Rect(viewport.X - onePx, viewport.Y, viewport.Width + onePx * 2, viewport.Height);
+        return LayoutRounding.MakeClipRect(expanded, DpiScale, rightPx: 0, bottomPx: 0);
     }
 
     private static bool IsBarVisible(ScrollMode visibility, bool needed)

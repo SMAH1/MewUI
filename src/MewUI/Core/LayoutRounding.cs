@@ -2,6 +2,33 @@ namespace Aprillz.MewUI;
 
 public static class LayoutRounding
 {
+    /// <summary>
+    /// Snaps bounds geometry (background/border/layout boxes) to device pixels.
+    /// This snapping may shrink/grow by rounding edges, so prefer it for geometry that should be stable.
+    /// </summary>
+    public static Rect SnapBoundsRectToPixels(Rect rect, double dpiScale) =>
+        SnapRectEdgesToPixels(rect, dpiScale);
+
+    /// <summary>
+    /// Snaps a viewport rectangle to device pixels without allowing it to shrink due to rounding.
+    /// Prefer this for scroll viewports and clip rectangles.
+    /// </summary>
+    public static Rect SnapViewportRectToPixels(Rect rect, double dpiScale) =>
+        SnapRectEdgesToPixelsOutward(rect, dpiScale);
+
+    /// <summary>
+    /// Produces a clip rectangle that won't shrink due to rounding and can optionally be expanded by whole device pixels.
+    /// </summary>
+    public static Rect MakeClipRect(Rect rect, double dpiScale, int rightPx = 1, int bottomPx = 1) =>
+        ExpandClipByDevicePixels(rect, dpiScale, rightPx, bottomPx);
+
+    /// <summary>
+    /// Snaps a constraint rectangle (used for Measure inputs) to device pixels.
+    /// This should be stable and must not cause layout expansion beyond the available slot.
+    /// </summary>
+    public static Rect SnapConstraintRectToPixels(Rect rect, double dpiScale) =>
+        SnapRectEdgesToPixels(rect, dpiScale);
+
     public static double SnapThicknessToPixels(double thicknessDip, double dpiScale, int minPixels)
     {
         if (thicknessDip <= 0)

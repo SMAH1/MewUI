@@ -258,7 +258,8 @@ public abstract class TextBase : Control
     {
         var viewportBounds = GetViewportInnerBounds();
         var dpiScale = GetDpi() / 96.0;
-        return LayoutRounding.SnapRectEdgesToPixels(viewportBounds.Deflate(Padding), dpiScale);
+        // Viewport/clip rect should not shrink due to edge rounding; snap outward.
+        return LayoutRounding.SnapViewportRectToPixels(viewportBounds.Deflate(Padding), dpiScale);
     }
 
     protected abstract void RenderTextContent(IGraphicsContext context, Rect contentBounds, IFont font, Theme theme, in VisualState state);
@@ -287,7 +288,7 @@ public abstract class TextBase : Control
 
         context.Save();
         var dpiScale = GetDpi() / 96.0;
-        context.SetClip(LayoutRounding.ExpandClipByDevicePixels(contentBounds, dpiScale));
+        context.SetClip(LayoutRounding.MakeClipRect(contentBounds, dpiScale));
 
         var font = GetFont();
 

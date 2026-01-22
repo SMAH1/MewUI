@@ -239,7 +239,8 @@ public sealed class MultiLineTextBox : TextBase
         using var measure = BeginTextMeasurement();
 
         // Overlay scrollbars: viewport does not shrink when bars appear/disappear.
-        var finalViewportContent = LayoutRounding.SnapRectEdgesToPixels(innerBounds.Deflate(Padding), dpiScale);
+        // Viewport/clip rect should not shrink due to edge rounding; snap outward.
+        var finalViewportContent = LayoutRounding.SnapViewportRectToPixels(innerBounds.Deflate(Padding), dpiScale);
         double finalViewportH = Math.Max(0, finalViewportContent.Height);
         double finalViewportW = Math.Max(0, finalViewportContent.Width);
 

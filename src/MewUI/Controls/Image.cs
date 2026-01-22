@@ -92,7 +92,8 @@ public sealed class Image : Control
         // Always clip to the control bounds to avoid overflowing when the image's natural size
         // is larger than the arranged size.
         context.Save();
-        context.SetClip(Bounds);
+        var dpiScale = GetDpi() / 96.0;
+        context.SetClip(LayoutRounding.SnapViewportRectToPixels(Bounds, dpiScale));
 
         try
         {
