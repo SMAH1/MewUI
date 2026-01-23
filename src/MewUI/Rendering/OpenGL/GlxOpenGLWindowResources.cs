@@ -13,14 +13,16 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
 
     public nint GlxContext { get; }
     public bool SupportsBgra { get; }
+    public bool SupportsNpotTextures { get; }
     public OpenGLTextCache TextCache { get; } = new();
 
-    private GlxOpenGLWindowResources(nint display, nint window, nint ctx, bool supportsBgra)
+    private GlxOpenGLWindowResources(nint display, nint window, nint ctx, bool supportsBgra, bool supportsNpotTextures)
     {
         _display = display;
         _window = window;
         GlxContext = ctx;
         SupportsBgra = supportsBgra;
+        SupportsNpotTextures = supportsNpotTextures;
     }
 
     public static GlxOpenGLWindowResources Create(nint display, nint window)
@@ -82,6 +84,7 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
             }
 
             bool supportsBgra = DetectBgraSupport();
+            bool supportsNpot = DetectNpotSupport();
             DiagLog.Write($"GLX context ok: ctx=0x{ctx.ToInt64():X} BGRA={supportsBgra}");
 
             GL.Disable(0x0B71 /* GL_DEPTH_TEST */);
@@ -95,7 +98,7 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
 
             LibGL.glXMakeCurrent(display, 0, 0);
 
-            return new GlxOpenGLWindowResources(display, window, ctx, supportsBgra);
+            return new GlxOpenGLWindowResources(display, window, ctx, supportsBgra, supportsNpot);
         }
         finally
         {
@@ -108,6 +111,61 @@ internal sealed class GlxOpenGLWindowResources : IOpenGLWindowResources
         string? extensions = GL.GetExtensions();
         return !string.IsNullOrEmpty(extensions) &&
                extensions.Contains("GL_EXT_bgra", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool DetectNpotSupport()
+    {
+        if (TryGetMajorMinor(GL.GetVersionString(), out int major, out int minor))
+        {
+            if (major > 2 || (major == 2 && minor >= 0))
+            {
+                return true;
+            }
+        }
+
+        string? extensions = GL.GetExtensions();
+        return !string.IsNullOrEmpty(extensions) &&
+               extensions.Contains("GL_ARB_texture_non_power_of_two", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetMajorMinor(string? version, out int major, out int minor)
+    {
+        major = 0;
+        minor = 0;
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return false;
+        }
+
+        int i = 0;
+        while (i < version.Length && !(char.IsDigit(version[i])))
+        {
+            i++;
+        }
+
+        int dot = version.IndexOf('.', i);
+        if (dot <= i)
+        {
+            return false;
+        }
+
+        int j = dot + 1;
+        while (j < version.Length && char.IsDigit(version[j]))
+        {
+            j++;
+        }
+
+        if (!int.TryParse(version.AsSpan(i, dot - i), out major))
+        {
+            return false;
+        }
+
+        if (!int.TryParse(version.AsSpan(dot + 1, j - (dot + 1)), out minor))
+        {
+            minor = 0;
+        }
+
+        return true;
     }
 
     public void MakeCurrent(nint deviceOrDisplay)

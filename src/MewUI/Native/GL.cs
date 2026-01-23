@@ -31,12 +31,14 @@ internal static class GL
     internal const uint GL_UNSIGNED_BYTE = 0x1401;
     internal const uint GL_BGRA_EXT = 0x80E1;
 
+    internal const uint GL_VERSION = 0x1F02;
     internal const uint GL_EXTENSIONS = 0x1F03;
 
     internal const uint GL_TEXTURE_MIN_FILTER = 0x2801;
     internal const uint GL_TEXTURE_MAG_FILTER = 0x2800;
     internal const uint GL_NEAREST = 0x2600;
     internal const uint GL_LINEAR = 0x2601;
+    internal const uint GL_LINEAR_MIPMAP_LINEAR = 0x2703;
     internal const uint GL_TEXTURE_WRAP_S = 0x2802;
     internal const uint GL_TEXTURE_WRAP_T = 0x2803;
     internal const uint GL_CLAMP = 0x2900;
@@ -44,6 +46,8 @@ internal static class GL
 
     internal const uint GL_LINE_SMOOTH_HINT = 0x0C52;
     internal const uint GL_NICEST = 0x1102;
+
+    internal const uint GL_NO_ERROR = 0;
 
     public static void Viewport(int x, int y, int width, int height)
     {
@@ -323,6 +327,24 @@ internal static class GL
 
     public static nint GetString(uint name)
         => OperatingSystem.IsWindows() ? OpenGL32.glGetString(name) : LibGL.glGetString(name);
+
+    public static uint GetError()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return OpenGL32.glGetError();
+        }
+        else
+        {
+            return LibGL.glGetError();
+        }
+    }
+
+    public static string? GetVersionString()
+    {
+        nint p = GetString(GL_VERSION);
+        return p == 0 ? null : Marshal.PtrToStringAnsi(p);
+    }
 
     public static string? GetExtensions()
     {

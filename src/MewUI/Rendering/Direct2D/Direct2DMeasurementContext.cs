@@ -9,6 +9,8 @@ internal sealed unsafe class Direct2DMeasurementContext : IGraphicsContext
 
     public double DpiScale => 1.0;
 
+    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+
     public Direct2DMeasurementContext(nint dwriteFactory) => _dwriteFactory = dwriteFactory;
 
     public void Dispose() { }

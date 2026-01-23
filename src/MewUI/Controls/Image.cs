@@ -7,11 +7,17 @@ public sealed class Image : Control
     private readonly Dictionary<GraphicsBackend, IImage> _cache = new();
     private INotifyImageChanged? _notifySource;
 
+    public ImageInterpolationMode InterpolationMode
+    {
+        get;
+        set { field = value; InvalidateVisual(); }
+    } = ImageInterpolationMode.Default;
+
     public ImageStretch StretchMode
     {
         get;
         set { field = value; InvalidateMeasure(); InvalidateVisual(); }
-    } = ImageStretch.None;
+    } = ImageStretch.Uniform;
 
     public Rect? ViewBox
     {
@@ -89,6 +95,9 @@ public sealed class Image : Control
             return;
         }
 
+        var prevInterpolationMode = context.ImageInterpolationMode;
+        context.ImageInterpolationMode = InterpolationMode;
+
         // Always clip to the control bounds to avoid overflowing when the image's natural size
         // is larger than the arranged size.
         context.Save();
@@ -113,6 +122,7 @@ public sealed class Image : Control
         finally
         {
             context.Restore();
+            context.ImageInterpolationMode = prevInterpolationMode;
         }
     }
 

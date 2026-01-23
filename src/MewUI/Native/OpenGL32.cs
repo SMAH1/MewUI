@@ -102,4 +102,7 @@ internal static partial class OpenGL32
 
     [LibraryImport(LibraryName)]
     public static partial nint glGetString(uint name);
+
+    [LibraryImport(LibraryName)]
+    public static partial uint glGetError();
 }

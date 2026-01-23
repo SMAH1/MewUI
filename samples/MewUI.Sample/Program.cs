@@ -53,6 +53,7 @@ var root = new Window()
 
                         new TabControl()
                             .VerticalScroll(ScrollMode.Auto)
+                            .Padding(50)
                             .TabItems(
                                 new TabItem()
                                     .Header("Controls")
@@ -337,6 +338,7 @@ Element NormalControls()
                                     new Image()
                                         .Source(logo)
                                         .StretchMode(ImageStretch.Uniform)
+                                        .InterpolationMode(ImageInterpolationMode.HighQuality)
                                         .Size(16, 16),
 
                                     new Label()
@@ -553,11 +555,13 @@ FrameworkElement ImageDemo() => new UniformGrid()
     .Spacing(8)
     .Children(
         new Image()
+            .InterpolationMode(ImageInterpolationMode.HighQuality)
             .Source(april)
             .Size(96, 96)
             .StretchMode(ImageStretch.Uniform),
 
         new Image()
+            .InterpolationMode(ImageInterpolationMode.HighQuality)
             .SourceFile("logo-256.png")
             .Size(96, 96)
             .StretchMode(ImageStretch.Uniform)

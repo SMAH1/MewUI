@@ -19,6 +19,12 @@ internal sealed class GdiDoubleBufferedContext : IGraphicsContext
 
     public double DpiScale => _context.DpiScale;
 
+    public ImageInterpolationMode ImageInterpolationMode
+    {
+        get => _context.ImageInterpolationMode;
+        set => _context.ImageInterpolationMode = value;
+    }
+
     private sealed class BackBuffer : IDisposable
     {
         private static readonly Dictionary<nint, BackBuffer> Cache = new();

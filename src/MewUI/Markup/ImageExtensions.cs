@@ -36,6 +36,12 @@ public static class ImageExtensions
         return image;
     }
 
+    public static Image InterpolationMode(this Image image, ImageInterpolationMode mode)
+    {
+        image.InterpolationMode = mode;
+        return image;
+    }
+
     public static Image ViewBox(this Image image, Rect? viewBox, ImageViewBoxUnits units = ImageViewBoxUnits.Pixels)
     {
         image.ViewBox = viewBox;

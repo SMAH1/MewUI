@@ -31,6 +31,8 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
 
     public double DpiScale => _stateManager.DpiScale;
 
+    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+
     internal nint Hdc { get; }
 
     public GdiGraphicsContext(

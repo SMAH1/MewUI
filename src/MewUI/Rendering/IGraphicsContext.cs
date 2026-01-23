@@ -109,6 +109,12 @@ namespace Aprillz.MewUI.Rendering
         #region Image Rendering
 
         /// <summary>
+        /// Gets or sets the image interpolation mode used when drawing images.
+        /// Backends may treat <see cref="ImageInterpolationMode.Default"/> as an alias for their default mode.
+        /// </summary>
+        ImageInterpolationMode ImageInterpolationMode { get; set; }
+
+        /// <summary>
         /// Draws an image at the specified location.
         /// </summary>
         void DrawImage(IImage image, Point location);

@@ -13,13 +13,15 @@ internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
 
     public nint Hglrc { get; }
     public bool SupportsBgra { get; }
+    public bool SupportsNpotTextures { get; }
     public OpenGLTextCache TextCache { get; } = new();
 
-    private WglOpenGLWindowResources(nint hwnd, nint hglrc, bool supportsBgra)
+    private WglOpenGLWindowResources(nint hwnd, nint hglrc, bool supportsBgra, bool supportsNpotTextures)
     {
         _hwnd = hwnd;
         Hglrc = hglrc;
         SupportsBgra = supportsBgra;
+        SupportsNpotTextures = supportsNpotTextures;
     }
 
     private const int WGL_DRAW_TO_WINDOW_ARB = 0x2001;
@@ -65,6 +67,7 @@ internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
         }
 
         bool supportsBgra = DetectBgraSupport();
+        bool supportsNpot = DetectNpotSupport();
 
         // Baseline state for 2D.
         GL.Disable(0x0B71 /* GL_DEPTH_TEST */);
@@ -78,7 +81,7 @@ internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
 
         OpenGL32.wglMakeCurrent(0, 0);
 
-        return new WglOpenGLWindowResources(hwnd, hglrc, supportsBgra);
+        return new WglOpenGLWindowResources(hwnd, hglrc, supportsBgra, supportsNpot);
     }
 
     private static unsafe bool TryChooseMultisamplePixelFormat(
@@ -252,6 +255,67 @@ internal sealed class WglOpenGLWindowResources : IOpenGLWindowResources
         string? extensions = GL.GetExtensions();
         return !string.IsNullOrEmpty(extensions) &&
                extensions.Contains("GL_EXT_bgra", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool DetectNpotSupport()
+    {
+        // Full NPOT (including mipmaps) is core in OpenGL 2.0+ and is also available via ARB extension.
+        // Avoid treating ES-style "OES_texture_npot" as full NPOT on desktop; it can be restricted.
+        if (TryGetMajorMinor(GL.GetVersionString(), out int major, out int minor))
+        {
+            if (major > 2 || (major == 2 && minor >= 0))
+            {
+                return true;
+            }
+        }
+
+        string? extensions = GL.GetExtensions();
+        return !string.IsNullOrEmpty(extensions) &&
+               extensions.Contains("GL_ARB_texture_non_power_of_two", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetMajorMinor(string? version, out int major, out int minor)
+    {
+        major = 0;
+        minor = 0;
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return false;
+        }
+
+        // Common formats:
+        // - "4.6.0 NVIDIA 551.61"
+        // - "1.1.0"
+        // - "OpenGL ES 3.2 ..."
+        int i = 0;
+        while (i < version.Length && !(char.IsDigit(version[i])))
+        {
+            i++;
+        }
+
+        int dot = version.IndexOf('.', i);
+        if (dot <= i)
+        {
+            return false;
+        }
+
+        int j = dot + 1;
+        while (j < version.Length && char.IsDigit(version[j]))
+        {
+            j++;
+        }
+
+        if (!int.TryParse(version.AsSpan(i, dot - i), out major))
+        {
+            return false;
+        }
+
+        if (!int.TryParse(version.AsSpan(dot + 1, j - (dot + 1)), out minor))
+        {
+            minor = 0;
+        }
+
+        return true;
     }
 
     public void MakeCurrent(nint deviceOrDisplay)

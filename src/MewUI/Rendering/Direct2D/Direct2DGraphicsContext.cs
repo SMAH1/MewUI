@@ -25,6 +25,8 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
     private int _clipDepth;
     private bool _disposed;
 
+    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+    
     public double DpiScale { get; }
 
     public Direct2DGraphicsContext(nint hwnd, double dpiScale, nint renderTarget, int renderTargetGeneration, nint dwriteFactory, Action? onRecreateTarget)
@@ -378,20 +380,88 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
             return;
         }
 
-        nint bmp = image.GetOrCreateBitmap(_renderTarget, _renderTargetGeneration);
+        int mipLevel = 0;
+        if (ImageInterpolationMode == ImageInterpolationMode.HighQuality)
+        {
+            mipLevel = SelectHighQualityMipLevel(sourceRect, destRect, DpiScale);
+        }
+
+        nint bmp = mipLevel == 0
+            ? image.GetOrCreateBitmap(_renderTarget, _renderTargetGeneration)
+            : image.GetOrCreateBitmapForMip(_renderTarget, _renderTargetGeneration, mipLevel);
         if (bmp == 0)
         {
             return;
         }
 
-        var dst = ToRectF(destRect);
-        var src = new D2D1_RECT_F(
-            left: (float)sourceRect.X,
-            top: (float)sourceRect.Y,
-            right: (float)sourceRect.Right,
-            bottom: (float)sourceRect.Bottom);
+        // Pixel-snap the destination rect in *world space* (including translation) to avoid shimmering
+        // from sub-pixel bitmap sampling. GDI tends to quantize to integer pixels, so this brings
+        // D2D closer to that visual stability.
+        var worldDest = new Rect(destRect.X + _translateX, destRect.Y + _translateY, destRect.Width, destRect.Height);
+        var snappedWorldDest = LayoutRounding.SnapRectEdgesToPixels(worldDest, DpiScale);
+        var snappedLocalDest = new Rect(
+            snappedWorldDest.X - _translateX,
+            snappedWorldDest.Y - _translateY,
+            snappedWorldDest.Width,
+            snappedWorldDest.Height);
 
-        D2D1VTable.DrawBitmap((ID2D1RenderTarget*)_renderTarget, bmp, dst, opacity: 1.0f, D2D1_BITMAP_INTERPOLATION_MODE.LINEAR, src);
+        var dst = ToRectF(snappedLocalDest);
+        var src = mipLevel == 0
+            ? new D2D1_RECT_F(
+                left: (float)sourceRect.X,
+                top: (float)sourceRect.Y,
+                right: (float)sourceRect.Right,
+                bottom: (float)sourceRect.Bottom)
+            : CreateMipSourceRect(sourceRect, mipLevel);
+
+        var interpolation = ImageInterpolationMode switch
+        {
+            ImageInterpolationMode.NearestNeighbor => D2D1_BITMAP_INTERPOLATION_MODE.NEAREST_NEIGHBOR,
+            _ => D2D1_BITMAP_INTERPOLATION_MODE.LINEAR,
+        };
+
+        D2D1VTable.DrawBitmap((ID2D1RenderTarget*)_renderTarget, bmp, dst, opacity: 1.0f, interpolation, src);
+    }
+
+    private static int SelectHighQualityMipLevel(Rect sourceRect, Rect destRect, double dpiScale)
+    {
+        // NOTE:
+        // - sourceRect is in *source pixel space* (1 unit == 1 source pixel).
+        // - destRect is in *DIP space*, so convert to device pixels before comparing.
+        double destW = Math.Max(1e-6, destRect.Width * dpiScale);
+        double destH = Math.Max(1e-6, destRect.Height * dpiScale);
+
+        double srcW = Math.Max(1.0, sourceRect.Width);
+        double srcH = Math.Max(1.0, sourceRect.Height);
+
+        double scaleX = srcW / destW;
+        double scaleY = srcH / destH;
+        double scale = Math.Max(scaleX, scaleY);
+
+        if (scale <= 2.0)
+        {
+            return 0;
+        }
+
+        // Reduce to a mip level where the remaining downscale is <= 2x, then let D2D linear handle the rest.
+        int level = 0;
+        while (scale > 2.0 && level < 12)
+        {
+            scale *= 0.5;
+            level++;
+        }
+
+        return level;
+    }
+
+    private static D2D1_RECT_F CreateMipSourceRect(Rect sourceRect, int mipLevel)
+    {
+        double factor = 1 << Math.Min(mipLevel, 30);
+        return new D2D1_RECT_F(
+            left: (float)(sourceRect.X / factor),
+            top: (float)(sourceRect.Y / factor),
+            right: (float)(sourceRect.Right / factor),
+            bottom: (float)(sourceRect.Bottom / factor));
     }
 
     private nint GetSolidBrush(Color color)

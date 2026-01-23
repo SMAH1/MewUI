@@ -96,4 +96,7 @@ internal static partial class LibGL
 
     [LibraryImport(LibraryName)]
     public static partial nint glGetString(uint name);
+
+    [LibraryImport(LibraryName)]
+    public static partial uint glGetError();
 }

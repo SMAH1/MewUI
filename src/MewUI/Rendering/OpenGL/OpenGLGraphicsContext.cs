@@ -18,6 +18,8 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
     private int _viewportHeightPx;
     private bool _disposed;
 
+    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+
     public double DpiScale { get; }
 
     private readonly struct SavedState
@@ -653,8 +655,9 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
             throw new ArgumentException("Image must be an OpenGLImage.", nameof(image));
         }
 
-        uint tex = glImage.GetOrCreateTexture(_resources, _hwnd);
-        if (tex == 0)
+        bool wantMipmaps = ImageInterpolationMode == ImageInterpolationMode.HighQuality;
+        var texInfo = glImage.GetOrCreateTexture(_resources, _hwnd, wantMipmaps);
+        if (texInfo.TextureId == 0)
         {
             return;
         }
@@ -665,13 +668,32 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
             return;
         }
 
-        GL.BindTexture(GL.GL_TEXTURE_2D, tex);
+        GL.BindTexture(GL.GL_TEXTURE_2D, texInfo.TextureId);
+        var filter = ApplyImageInterpolationMode(texInfo.HasMipmaps);
         GL.Color4ub(255, 255, 255, 255);
+
+        // When using linear sampling, align texture coordinates to texel centers to avoid sampling
+        // outside the image bounds (which can show up as shimmering/jagged edges at borders).
+        float u0, v0, u1, v1;
+        if (filter == GL.GL_NEAREST)
+        {
+            u0 = 0f; v0 = 0f; u1 = texInfo.UMax; v1 = texInfo.VMax;
+        }
+        else
+        {
+            float invW = 1f / texInfo.TextureWidth;
+            float invH = 1f / texInfo.TextureHeight;
+            u0 = 0.5f * invW;
+            v0 = 0.5f * invH;
+            u1 = (glImage.PixelWidth - 0.5f) * invW;
+            v1 = (glImage.PixelHeight - 0.5f) * invH;
+        }
+
         GL.Begin(GL.GL_QUADS);
-        GL.TexCoord2f(0, 0); GL.Vertex2f(dst.left, dst.top);
-        GL.TexCoord2f(1, 0); GL.Vertex2f(dst.right, dst.top);
-        GL.TexCoord2f(1, 1); GL.Vertex2f(dst.right, dst.bottom);
-        GL.TexCoord2f(0, 1); GL.Vertex2f(dst.left, dst.bottom);
+        GL.TexCoord2f(u0, v0); GL.Vertex2f(dst.left, dst.top);
+        GL.TexCoord2f(u1, v0); GL.Vertex2f(dst.right, dst.top);
+        GL.TexCoord2f(u1, v1); GL.Vertex2f(dst.right, dst.bottom);
+        GL.TexCoord2f(u0, v1); GL.Vertex2f(dst.left, dst.bottom);
         GL.End();
     }
 
@@ -684,8 +706,9 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
             throw new ArgumentException("Image must be an OpenGLImage.", nameof(image));
         }
 
-        uint tex = glImage.GetOrCreateTexture(_resources, _hwnd);
-        if (tex == 0)
+        bool wantMipmaps = ImageInterpolationMode == ImageInterpolationMode.HighQuality;
+        var texInfo = glImage.GetOrCreateTexture(_resources, _hwnd, wantMipmaps);
+        if (texInfo.TextureId == 0)
         {
             return;
         }
@@ -696,13 +719,30 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
             return;
         }
 
-        double u0 = Math.Clamp(sourceRect.X / image.PixelWidth, 0, 1);
-        double v0 = Math.Clamp(sourceRect.Y / image.PixelHeight, 0, 1);
-        double u1 = Math.Clamp(sourceRect.Right / image.PixelWidth, 0, 1);
-        double v1 = Math.Clamp(sourceRect.Bottom / image.PixelHeight, 0, 1);
-
-        GL.BindTexture(GL.GL_TEXTURE_2D, tex);
+        GL.BindTexture(GL.GL_TEXTURE_2D, texInfo.TextureId);
+        var filter = ApplyImageInterpolationMode(texInfo.HasMipmaps);
         GL.Color4ub(255, 255, 255, 255);
+
+        double u0;
+        double v0;
+        double u1;
+        double v1;
+        if (filter == GL.GL_NEAREST)
+        {
+            u0 = Math.Clamp(sourceRect.X / texInfo.TextureWidth, 0, texInfo.UMax);
+            v0 = Math.Clamp(sourceRect.Y / texInfo.TextureHeight, 0, texInfo.VMax);
+            u1 = Math.Clamp(sourceRect.Right / texInfo.TextureWidth, 0, texInfo.UMax);
+            v1 = Math.Clamp(sourceRect.Bottom / texInfo.TextureHeight, 0, texInfo.VMax);
+        }
+        else
+        {
+            // Inset by half a texel when using linear filtering to avoid sampling outside the source rect.
+            u0 = Math.Clamp((sourceRect.X + 0.5) / texInfo.TextureWidth, 0, texInfo.UMax);
+            v0 = Math.Clamp((sourceRect.Y + 0.5) / texInfo.TextureHeight, 0, texInfo.VMax);
+            u1 = Math.Clamp((sourceRect.Right - 0.5) / texInfo.TextureWidth, 0, texInfo.UMax);
+            v1 = Math.Clamp((sourceRect.Bottom - 0.5) / texInfo.TextureHeight, 0, texInfo.VMax);
+        }
+
         GL.Begin(GL.GL_QUADS);
         GL.TexCoord2f((float)u0, (float)v0); GL.Vertex2f(dst.left, dst.top);
         GL.TexCoord2f((float)u1, (float)v0); GL.Vertex2f(dst.right, dst.top);
@@ -714,6 +754,35 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
     #endregion
 
     #region Helpers
+
+    private uint ApplyImageInterpolationMode(bool hasMipmaps)
+    {
+        uint minFilter;
+        uint magFilter;
+
+        if (ImageInterpolationMode == ImageInterpolationMode.NearestNeighbor)
+        {
+            minFilter = GL.GL_NEAREST;
+            magFilter = GL.GL_NEAREST;
+        }
+        else if (ImageInterpolationMode == ImageInterpolationMode.HighQuality && hasMipmaps)
+        {
+            // Trilinear sampling for minification reduces shimmer/jaggies when downscaling.
+            minFilter = GL.GL_LINEAR_MIPMAP_LINEAR;
+            magFilter = GL.GL_LINEAR;
+        }
+        else
+        {
+            minFilter = GL.GL_LINEAR;
+            magFilter = GL.GL_LINEAR;
+        }
+
+        GL.TexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, (int)minFilter);
+        GL.TexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, (int)magFilter);
+        return magFilter;
+    }
+
+    private static bool IsPowerOfTwo(int value) => value > 0 && (value & (value - 1)) == 0;
 
     private float ToDeviceCoord(double valueDipWithTranslate, int thicknessPx)
     {
@@ -797,7 +866,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         rx = Math.Min(rx, w / 2f);
         ry = Math.Min(ry, h / 2f);
 
-        int arcSegments = Math.Clamp((int)Math.Ceiling(Math.Max(rx, ry) * 1.0f), 8, 96);
+        int arcSegments = Math.Clamp((int)Math.Ceiling(Math.Max(rx, ry) * 1.0f), 16, 96);
 
         float offset = (thicknessPx & 1) == 1 ? 0.5f : 0f;
         left += offset;
