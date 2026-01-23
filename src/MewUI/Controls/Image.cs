@@ -7,11 +7,11 @@ public sealed class Image : Control
     private readonly Dictionary<GraphicsBackend, IImage> _cache = new();
     private INotifyImageChanged? _notifySource;
 
-    public ImageInterpolationMode InterpolationMode
+    public ImageScaleQuality InterpolationMode
     {
         get;
         set { field = value; InvalidateVisual(); }
-    } = ImageInterpolationMode.Default;
+    } = ImageScaleQuality.Default;
 
     public ImageStretch StretchMode
     {

@@ -64,7 +64,7 @@ FrameworkElement TopBar()
                         .Children(
                             new Image()
                                 .Source(logo)
-                                .InterpolationMode(ImageInterpolationMode.HighQuality)
+                                .ImageScaleQuality(ImageScaleQuality.HighQuality)
                                 .Width(300)
                                 .Height(80)
                                 .CenterVertical(),
@@ -465,7 +465,7 @@ FrameworkElement MediaPage()
                                     b.Child = new Image()
                                         .Source(april)
                                         .StretchMode(ImageStretch.Uniform)
-                                        .InterpolationMode(ImageInterpolationMode.HighQuality);
+                                        .ImageScaleQuality(ImageScaleQuality.HighQuality);
                                 }),
 
                             new Border()
@@ -481,7 +481,7 @@ FrameworkElement MediaPage()
                                         // Center crop: take the middle 50% of the source.
                                         .ViewBoxRelative(new Rect(0.25, 0.25, 0.5, 0.5))
                                         .StretchMode(ImageStretch.UniformToFill)
-                                        .InterpolationMode(ImageInterpolationMode.HighQuality);
+                                        .ImageScaleQuality(ImageScaleQuality.HighQuality);
                                 })
                         ),
 

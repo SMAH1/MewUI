@@ -110,9 +110,9 @@ namespace Aprillz.MewUI.Rendering
 
         /// <summary>
         /// Gets or sets the image interpolation mode used when drawing images.
-        /// Backends may treat <see cref="ImageInterpolationMode.Default"/> as an alias for their default mode.
+        /// Backends may treat <see cref="ImageScaleQuality.Default"/> as an alias for their default mode.
         /// </summary>
-        ImageInterpolationMode ImageInterpolationMode { get; set; }
+        ImageScaleQuality ImageInterpolationMode { get; set; }
 
         /// <summary>
         /// Draws an image at the specified location.

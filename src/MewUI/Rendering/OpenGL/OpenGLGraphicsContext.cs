@@ -18,7 +18,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
     private int _viewportHeightPx;
     private bool _disposed;
 
-    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+    public ImageScaleQuality ImageInterpolationMode { get; set; } = ImageScaleQuality.Default;
 
     public double DpiScale { get; }
 
@@ -655,7 +655,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
             throw new ArgumentException("Image must be an OpenGLImage.", nameof(image));
         }
 
-        bool wantMipmaps = ImageInterpolationMode == ImageInterpolationMode.HighQuality;
+        bool wantMipmaps = ImageInterpolationMode == ImageScaleQuality.HighQuality;
         var texInfo = glImage.GetOrCreateTexture(_resources, _hwnd, wantMipmaps);
         if (texInfo.TextureId == 0)
         {
@@ -706,7 +706,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
             throw new ArgumentException("Image must be an OpenGLImage.", nameof(image));
         }
 
-        bool wantMipmaps = ImageInterpolationMode == ImageInterpolationMode.HighQuality;
+        bool wantMipmaps = ImageInterpolationMode == ImageScaleQuality.HighQuality;
         var texInfo = glImage.GetOrCreateTexture(_resources, _hwnd, wantMipmaps);
         if (texInfo.TextureId == 0)
         {
@@ -760,12 +760,12 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         uint minFilter;
         uint magFilter;
 
-        if (ImageInterpolationMode == ImageInterpolationMode.NearestNeighbor)
+        if (ImageInterpolationMode == ImageScaleQuality.NearestNeighbor)
         {
             minFilter = GL.GL_NEAREST;
             magFilter = GL.GL_NEAREST;
         }
-        else if (ImageInterpolationMode == ImageInterpolationMode.HighQuality && hasMipmaps)
+        else if (ImageInterpolationMode == ImageScaleQuality.HighQuality && hasMipmaps)
         {
             // Trilinear sampling for minification reduces shimmer/jaggies when downscaling.
             minFilter = GL.GL_LINEAR_MIPMAP_LINEAR;

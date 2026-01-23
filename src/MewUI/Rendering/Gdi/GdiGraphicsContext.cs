@@ -31,7 +31,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
 
     public double DpiScale => _stateManager.DpiScale;
 
-    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+    public ImageScaleQuality ImageInterpolationMode { get; set; } = ImageScaleQuality.Default;
 
     internal nint Hdc { get; }
 
@@ -708,7 +708,8 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
         var memDc = Gdi32.CreateCompatibleDC(Hdc);
         var oldBitmap = Gdi32.SelectObject(memDc, gdiImage.Handle);
 
-        int mode = _imageScaleQuality == ImageScaleQuality.HighQuality
+        var effective = _imageScaleQuality == ImageScaleQuality.Default ? ImageScaleQuality.HighQuality : _imageScaleQuality;
+        int mode = effective is ImageScaleQuality.HighQuality or ImageScaleQuality.Linear
             ? GdiConstants.HALFTONE
             : GdiConstants.COLORONCOLOR;
 
@@ -729,7 +730,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
             int srcH = (int)sourceRect.Height;
 
             // Try to use cached scaled bitmap for high-quality downscaling
-            if (_imageScaleQuality == ImageScaleQuality.HighQuality &&
+            if (effective == ImageScaleQuality.HighQuality &&
                 IsNearInt(sourceRect.X) && IsNearInt(sourceRect.Y) &&
                 IsNearInt(sourceRect.Width) && IsNearInt(sourceRect.Height) &&
                 gdiImage.TryGetOrCreateScaledBitmap(srcX, srcY, srcW, srcH, destPx.Width, destPx.Height, out var scaledBmp))

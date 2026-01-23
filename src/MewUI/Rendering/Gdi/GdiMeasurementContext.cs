@@ -15,7 +15,7 @@ internal sealed class GdiMeasurementContext : IGraphicsContext
 
     public double DpiScale => _dpiScale;
 
-    public ImageInterpolationMode ImageInterpolationMode { get; set; } = ImageInterpolationMode.Default;
+    public ImageScaleQuality ImageInterpolationMode { get; set; } = ImageScaleQuality.Default;
 
     public GdiMeasurementContext(nint hdc, uint dpi)
     {

@@ -337,8 +337,8 @@ Element NormalControls()
                                 .Children(
                                     new Image()
                                         .Source(logo)
+                                        .ImageScaleQuality(ImageScaleQuality.HighQuality)
                                         .StretchMode(ImageStretch.Uniform)
-                                        .InterpolationMode(ImageInterpolationMode.HighQuality)
                                         .Size(16, 16),
 
                                     new Label()
@@ -456,6 +456,10 @@ Element NormalControls()
                                     new CheckBox()
                                         .Text("Enable feature"),
 
+                                    new CheckBox()
+                                        .Text("Three-state (Indeterminate)")
+                                        .IsThreeState(true)
+                                        .IsChecked(null),
                                             new StackPanel()
                                                 .Horizontal()
                                                 .Spacing(8)
@@ -555,13 +559,13 @@ FrameworkElement ImageDemo() => new UniformGrid()
     .Spacing(8)
     .Children(
         new Image()
-            .InterpolationMode(ImageInterpolationMode.HighQuality)
+            .ImageScaleQuality(ImageScaleQuality.HighQuality)
             .Source(april)
             .Size(96, 96)
             .StretchMode(ImageStretch.Uniform),
 
         new Image()
-            .InterpolationMode(ImageInterpolationMode.HighQuality)
+            .ImageScaleQuality(ImageScaleQuality.HighQuality)
             .SourceFile("logo-256.png")
             .Size(96, 96)
             .StretchMode(ImageStretch.Uniform)

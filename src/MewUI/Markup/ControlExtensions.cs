@@ -777,7 +777,7 @@ public static class ControlExtensions
     #endregion
 
     #region TabControl
-	
+
     public static TabControl Padding(this TabControl tabControl, Thickness padding)
     {
         tabControl.Padding = padding;

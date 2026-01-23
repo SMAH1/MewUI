@@ -7,7 +7,7 @@ namespace Aprillz.MewUI.Rendering.Gdi;
 /// <summary>
 /// GDI graphics factory implementation.
 /// </summary>
-public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleaser, IImageScaleQualityController
+public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleaser
 {
     public GraphicsBackend Backend => GraphicsBackend.Gdi;
 
