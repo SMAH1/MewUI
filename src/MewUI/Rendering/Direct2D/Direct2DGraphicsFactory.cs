@@ -66,10 +66,39 @@ public sealed unsafe class Direct2DGraphicsFactory : IGraphicsFactory, IWindowRe
     }
 
     public IFont CreateFont(string family, double size, FontWeight weight = FontWeight.Normal, bool italic = false, bool underline = false, bool strikethrough = false) =>
-        new DirectWriteFont(family, size, weight, italic, underline, strikethrough);
+        new DirectWriteFont(ResolveWin32FontFamilyOrFile(family), size, weight, italic, underline, strikethrough);
 
     public IFont CreateFont(string family, double size, uint dpi, FontWeight weight = FontWeight.Normal, bool italic = false, bool underline = false, bool strikethrough = false) =>
-        new DirectWriteFont(family, size, weight, italic, underline, strikethrough);
+        new DirectWriteFont(ResolveWin32FontFamilyOrFile(family), size, weight, italic, underline, strikethrough);
+
+    private void RefreshSystemFontCollection()
+    {
+        EnsureInitialized();
+        var factory = (IDWriteFactory*)_dwriteFactory;
+        int hr = DWriteVTable.GetSystemFontCollection(factory, out var collection, checkForUpdates: true);
+        if (hr >= 0 && collection != 0)
+        {
+            ComHelpers.Release(collection);
+        }
+    }
+
+    private string ResolveWin32FontFamilyOrFile(string familyOrPath)
+    {
+        if (!OperatingSystem.IsWindows() || !FontResources.LooksLikeFontFilePath(familyOrPath))
+        {
+            return familyOrPath;
+        }
+
+        var path = Path.GetFullPath(familyOrPath);
+        if (Win32Fonts.EnsurePrivateFont(path))
+        {
+            RefreshSystemFontCollection();
+        }
+
+        return FontResources.TryGetParsedFamilyName(path, out var parsed) && !string.IsNullOrWhiteSpace(parsed)
+            ? parsed
+            : "Segoe UI";
+    }
 
     public IImage CreateImageFromFile(string path) =>
         CreateImageFromBytes(File.ReadAllBytes(path));

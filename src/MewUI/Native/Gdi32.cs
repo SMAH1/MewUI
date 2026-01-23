@@ -114,6 +114,13 @@ internal static partial class Gdi32
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetTextExtentPoint32(nint hdc, string lpString, int c, out SIZE lpSize);
 
+    [LibraryImport(LibraryName, EntryPoint = "AddFontResourceExW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int AddFontResourceEx(string name, uint flags, nint reserved);
+
+    [LibraryImport(LibraryName, EntryPoint = "RemoveFontResourceExW", StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RemoveFontResourceEx(string name, uint flags, nint reserved);
+
     #endregion
 
     #region Drawing - Shapes

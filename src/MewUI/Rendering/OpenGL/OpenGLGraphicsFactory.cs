@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 
+using Aprillz.MewUI.Native;
 using Aprillz.MewUI.Rendering.FreeType;
 using Aprillz.MewUI.Rendering.Gdi;
 using Aprillz.MewUI.Resources;
@@ -23,6 +24,7 @@ public sealed class OpenGLGraphicsFactory : IGraphicsFactory, IWindowResourceRel
         if (OperatingSystem.IsWindows())
         {
             uint dpi = DpiHelper.GetSystemDpi();
+            family = ResolveWin32FontFamilyOrFile(family);
             return new GdiFont(family, size, weight, italic, underline, strikethrough, dpi);
         }
 
@@ -38,6 +40,7 @@ public sealed class OpenGLGraphicsFactory : IGraphicsFactory, IWindowResourceRel
     {
         if (OperatingSystem.IsWindows())
         {
+            family = ResolveWin32FontFamilyOrFile(family);
             return new GdiFont(family, size, weight, italic, underline, strikethrough, dpi);
         }
 
@@ -46,6 +49,21 @@ public sealed class OpenGLGraphicsFactory : IGraphicsFactory, IWindowResourceRel
         return path != null
             ? new FreeTypeFont(family, size, weight, italic, underline, strikethrough, path, px)
             : new BasicFont(family, size, weight, italic, underline, strikethrough);
+    }
+
+    private static string ResolveWin32FontFamilyOrFile(string familyOrPath)
+    {
+        if (!FontResources.LooksLikeFontFilePath(familyOrPath))
+        {
+            return familyOrPath;
+        }
+
+        var path = Path.GetFullPath(familyOrPath);
+        _ = Win32Fonts.EnsurePrivateFont(path);
+
+        return FontResources.TryGetParsedFamilyName(path, out var parsed) && !string.IsNullOrWhiteSpace(parsed)
+            ? parsed
+            : "Segoe UI";
     }
 
     public IImage CreateImageFromFile(string path) =>

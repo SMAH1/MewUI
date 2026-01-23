@@ -11,8 +11,21 @@ internal unsafe struct IDWriteFactory
 
 internal static unsafe class DWriteVTable
 {
+    private const uint GetSystemFontCollectionIndex = 3;
     private const uint CreateTextFormatIndex = 15;
     private const uint CreateTextLayoutIndex = 18;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int GetSystemFontCollection(IDWriteFactory* factory, out nint fontCollection, bool checkForUpdates)
+    {
+        fontCollection = 0;
+        nint collection = 0;
+        int check = checkForUpdates ? 1 : 0;
+        var fn = (delegate* unmanaged[Stdcall]<IDWriteFactory*, nint*, int, int>)factory->lpVtbl[GetSystemFontCollectionIndex];
+        int hr = fn(factory, &collection, check);
+        fontCollection = collection;
+        return hr;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int CreateTextFormat(

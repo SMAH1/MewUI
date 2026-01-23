@@ -1,4 +1,5 @@
 using Aprillz.MewUI;
+using Aprillz.MewUI.Native;
 using Aprillz.MewUI.Resources;
 
 namespace Aprillz.MewUI.Rendering.Gdi;
@@ -27,6 +28,7 @@ public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleas
         bool italic = false, bool underline = false, bool strikethrough = false)
     {
         uint dpi = DpiHelper.GetSystemDpi();
+        family = ResolveFontFamilyOrFile(family);
         return new GdiFont(family, size, weight, italic, underline, strikethrough, dpi);
     }
 
@@ -34,7 +36,26 @@ public sealed class GdiGraphicsFactory : IGraphicsFactory, IWindowResourceReleas
     /// Creates a font with a specific DPI.
     /// </summary>
     public IFont CreateFont(string family, double size, uint dpi, FontWeight weight = FontWeight.Normal,
-        bool italic = false, bool underline = false, bool strikethrough = false) => new GdiFont(family, size, weight, italic, underline, strikethrough, dpi);
+        bool italic = false, bool underline = false, bool strikethrough = false)
+    {
+        family = ResolveFontFamilyOrFile(family);
+        return new GdiFont(family, size, weight, italic, underline, strikethrough, dpi);
+    }
+
+    private static string ResolveFontFamilyOrFile(string familyOrPath)
+    {
+        if (!FontResources.LooksLikeFontFilePath(familyOrPath))
+        {
+            return familyOrPath;
+        }
+
+        var path = Path.GetFullPath(familyOrPath);
+        _ = Win32Fonts.EnsurePrivateFont(path);
+
+        return FontResources.TryGetParsedFamilyName(path, out var parsed) && !string.IsNullOrWhiteSpace(parsed)
+            ? parsed
+            : "Segoe UI";
+    }
 
     public IImage CreateImageFromFile(string path) =>
         CreateImageFromBytes(File.ReadAllBytes(path));
