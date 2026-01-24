@@ -185,11 +185,13 @@ public abstract class FrameworkElement : UIElement
         arrangeWidth = Math.Clamp(arrangeWidth, MinWidth, MaxWidth);
         arrangeHeight = Math.Clamp(arrangeHeight, MinHeight, MaxHeight);
 
-        double width = HorizontalAlignment == HorizontalAlignment.Stretch
+        // Stretch fills only when Width is auto (NaN). If Width is explicitly set,
+        // keep that size (clamped) and treat stretch as a left/top alignment within the slot.
+        double width = (HorizontalAlignment == HorizontalAlignment.Stretch && double.IsNaN(Width))
             ? availableWidth
             : Math.Min(arrangeWidth, availableWidth);
 
-        double height = VerticalAlignment == VerticalAlignment.Stretch
+        double height = (VerticalAlignment == VerticalAlignment.Stretch && double.IsNaN(Height))
             ? availableHeight
             : Math.Min(arrangeHeight, availableHeight);
 
