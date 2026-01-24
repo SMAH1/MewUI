@@ -1,6 +1,8 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 
+using Aprillz.MewUI.Native;
+using Aprillz.MewUI.Native.Structs;
 using Aprillz.MewUI.Rendering.Gdi.Core;
 using Aprillz.MewUI.Rendering.Gdi.Sdf;
 using Aprillz.MewUI.Rendering.Gdi.Simd;
@@ -43,6 +45,13 @@ internal sealed class HybridShapeRenderer
         byte srcA)
     {
         if (width <= 0 || height <= 0 || srcA == 0)
+        {
+            return;
+        }
+
+        // Fast path: opaque fill. Use direct GDI fills for the solid area and alpha-blend only corner tiles.
+        // This avoids a full-surface AlphaBlend for large rounded rectangles.
+        if (srcA == 255 && TryFillRoundedRectangleCornerBlend(targetDc, destX, destY, width, height, rx, ry, srcB, srcG, srcR))
         {
             return;
         }
@@ -175,6 +184,12 @@ internal sealed class HybridShapeRenderer
 
         // Snap stroke width to integer for pixel-perfect straight edges
         int strokePx = Math.Max(1, (int)MathF.Round(strokeWidth));
+
+        // Fast path: opaque stroke. Use direct GDI fills for straight stroke bands and alpha-blend only corner tiles.
+        if (srcA == 255 && TryDrawRoundedRectangleCornerBlend(targetDc, destX, destY, width, height, rx, ry, strokePx, srcB, srcG, srcR))
+        {
+            return;
+        }
 
         // Surface dimensions with AA padding (1px each side for edge anti-aliasing)
         const int aaPad = 1;
@@ -359,6 +374,235 @@ internal sealed class HybridShapeRenderer
     }
 
     #endregion
+
+    private static uint ToColorRef(byte b, byte g, byte r) => ((uint)b << 16) | ((uint)g << 8) | r;
+
+    private static void FillRect(nint dc, nint brush, int x, int y, int width, int height)
+    {
+        if (dc == 0 || brush == 0 || width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        var rect = RECT.FromXYWH(x, y, width, height);
+        Gdi32.FillRect(dc, ref rect, brush);
+    }
+
+    private bool TryFillRoundedRectangleCornerBlend(
+        nint targetDc,
+        int destX,
+        int destY,
+        int width,
+        int height,
+        float rx,
+        float ry,
+        byte srcB,
+        byte srcG,
+        byte srcR)
+    {
+        int rxPx = Math.Clamp((int)MathF.Round(rx), 0, width / 2);
+        int ryPx = Math.Clamp((int)MathF.Round(ry), 0, height / 2);
+
+        if (rxPx <= 0 || ryPx <= 0)
+        {
+            return false;
+        }
+
+        uint colorRef = ToColorRef(srcB, srcG, srcR);
+        nint brush = Gdi32.CreateSolidBrush(colorRef);
+        if (brush == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            // Fill the solid (non-corner) area directly with GDI.
+            FillRect(targetDc, brush, destX + rxPx, destY, width - rxPx * 2, height);
+            FillRect(targetDc, brush, destX, destY + ryPx, rxPx, height - ryPx * 2);
+            FillRect(targetDc, brush, destX + width - rxPx, destY + ryPx, rxPx, height - ryPx * 2);
+
+            // Alpha-blend only the four corner tiles.
+            FillRoundedCornerTiles(targetDc, destX, destY, width, height, rx, ry, rxPx, ryPx, srcB, srcG, srcR, 255, fillOnly: true, strokePx: 0);
+            return true;
+        }
+        finally
+        {
+            Gdi32.DeleteObject(brush);
+        }
+    }
+
+    private bool TryDrawRoundedRectangleCornerBlend(
+        nint targetDc,
+        int destX,
+        int destY,
+        int width,
+        int height,
+        float rx,
+        float ry,
+        int strokePx,
+        byte srcB,
+        byte srcG,
+        byte srcR)
+    {
+        int rxPx = Math.Clamp((int)MathF.Round(rx), 0, width / 2);
+        int ryPx = Math.Clamp((int)MathF.Round(ry), 0, height / 2);
+
+        if (strokePx <= 0 || rxPx <= 0 || ryPx <= 0)
+        {
+            return false;
+        }
+
+        // If the stroke consumes the radius, fall back to the full AA path.
+        if (strokePx >= rxPx || strokePx >= ryPx)
+        {
+            return false;
+        }
+
+        uint colorRef = ToColorRef(srcB, srcG, srcR);
+        nint brush = Gdi32.CreateSolidBrush(colorRef);
+        if (brush == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            // Fill straight stroke bands (inside alignment). Leave corners for AA tile blending.
+            FillRect(targetDc, brush, destX + rxPx, destY, width - rxPx * 2, strokePx);
+            FillRect(targetDc, brush, destX + rxPx, destY + height - strokePx, width - rxPx * 2, strokePx);
+            FillRect(targetDc, brush, destX, destY + ryPx, strokePx, height - ryPx * 2);
+            FillRect(targetDc, brush, destX + width - strokePx, destY + ryPx, strokePx, height - ryPx * 2);
+
+            FillRoundedCornerTiles(targetDc, destX, destY, width, height, rx, ry, rxPx, ryPx, srcB, srcG, srcR, 255, fillOnly: false, strokePx: strokePx);
+            return true;
+        }
+        finally
+        {
+            Gdi32.DeleteObject(brush);
+        }
+    }
+
+    private void FillRoundedCornerTiles(
+        nint targetDc,
+        int destX,
+        int destY,
+        int width,
+        int height,
+        float rx,
+        float ry,
+        int rxPx,
+        int ryPx,
+        byte srcB,
+        byte srcG,
+        byte srcR,
+        byte srcA,
+        bool fillOnly,
+        int strokePx)
+    {
+        var surface = _surfacePool.Rent(targetDc, rxPx, ryPx);
+        if (!surface.IsValid)
+        {
+            return;
+        }
+
+        try
+        {
+            surface.Clear();
+
+            var sampler = new SupersampleEdgeSampler(_supersampleFactor, srcA);
+
+            float halfW = width / 2f;
+            float halfH = height / 2f;
+
+            var outerSdf = new RoundedRectSdf(width, height, rx, ry);
+            RoundedRectSdf? innerSdf = null;
+            if (!fillOnly)
+            {
+                float wIn = Math.Max(0, width - strokePx * 2);
+                float hIn = Math.Max(0, height - strokePx * 2);
+                float rxIn = Math.Max(0, rx - strokePx);
+                float ryIn = Math.Max(0, ry - strokePx);
+                if (wIn > 0 && hIn > 0)
+                {
+                    innerSdf = new RoundedRectSdf(wIn, hIn, rxIn, ryIn);
+                }
+            }
+
+            Span<uint> premulTable = stackalloc uint[256];
+            GdiSimdDispatcher.BuildPremultipliedBgraTable(premulTable, srcB, srcG, srcR);
+
+            byte[]? rented = null;
+            Span<byte> alphaRow = rxPx <= GdiRenderingConstants.StackAllocAlphaRowThreshold
+                ? stackalloc byte[rxPx]
+                : (rented = ArrayPool<byte>.Shared.Rent(rxPx)).AsSpan(0, rxPx);
+
+            try
+            {
+                RenderCornerTile(surface, 0, 0, rxPx, ryPx, alphaRow, premulTable, outerSdf, innerSdf, sampler, halfW, halfH, fillOnly, srcA);
+                surface.AlphaBlendTo(targetDc, destX, destY, rxPx, ryPx, 0, 0);
+
+                surface.Clear();
+                RenderCornerTile(surface, width - rxPx, 0, rxPx, ryPx, alphaRow, premulTable, outerSdf, innerSdf, sampler, halfW, halfH, fillOnly, srcA);
+                surface.AlphaBlendTo(targetDc, destX + width - rxPx, destY, rxPx, ryPx, 0, 0);
+
+                surface.Clear();
+                RenderCornerTile(surface, 0, height - ryPx, rxPx, ryPx, alphaRow, premulTable, outerSdf, innerSdf, sampler, halfW, halfH, fillOnly, srcA);
+                surface.AlphaBlendTo(targetDc, destX, destY + height - ryPx, rxPx, ryPx, 0, 0);
+
+                surface.Clear();
+                RenderCornerTile(surface, width - rxPx, height - ryPx, rxPx, ryPx, alphaRow, premulTable, outerSdf, innerSdf, sampler, halfW, halfH, fillOnly, srcA);
+                surface.AlphaBlendTo(targetDc, destX + width - rxPx, destY + height - ryPx, rxPx, ryPx, 0, 0);
+            }
+            finally
+            {
+                if (rented != null)
+                {
+                    ArrayPool<byte>.Shared.Return(rented);
+                }
+            }
+        }
+        finally
+        {
+            _surfacePool.Return(surface);
+        }
+    }
+
+    private static unsafe void RenderCornerTile(
+        AaSurface surface,
+        int tileOriginX,
+        int tileOriginY,
+        int tileW,
+        int tileH,
+        Span<byte> alphaRow,
+        ReadOnlySpan<uint> premulTable,
+        RoundedRectSdf outerSdf,
+        RoundedRectSdf? innerSdf,
+        SupersampleEdgeSampler sampler,
+        float halfW,
+        float halfH,
+        bool fillOnly,
+        byte srcA)
+    {
+        byte* basePtr = (byte*)surface.Bits;
+        int stride = surface.Stride;
+
+        for (int y = 0; y < tileH; y++)
+        {
+            int py = tileOriginY + y;
+
+            for (int x = 0; x < tileW; x++)
+            {
+                int px = tileOriginX + x;
+                alphaRow[x] = fillOnly
+                    ? sampler.SampleRoundedRectEdge(px, py, outerSdf, halfW, halfH)
+                    : sampler.SampleRoundedRectStrokeEdgeSsaa(px, py, outerSdf, innerSdf, halfW, halfH);
+            }
+
+            byte* rowPtr = basePtr + y * stride;
+            GdiSimdDispatcher.WritePremultipliedBgraRow(rowPtr, alphaRow, premulTable);
+        }
+    }
 
     #region Ellipse
 
