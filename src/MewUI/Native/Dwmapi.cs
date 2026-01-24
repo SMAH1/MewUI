@@ -9,7 +9,7 @@ internal static partial class Dwmapi
     /// <summary>
     /// DWMWINDOWATTRIBUTE enumeration for DwmSetWindowAttribute.
     /// </summary>
-    public enum DwmWindowAttribute : uint
+    internal enum DwmWindowAttribute : uint
     {
         /// <summary>
         /// Use immersive dark mode (Windows 10 build 17763-18985).

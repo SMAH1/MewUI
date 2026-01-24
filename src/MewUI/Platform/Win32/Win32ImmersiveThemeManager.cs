@@ -1,5 +1,6 @@
 ﻿using Aprillz.MewUI.Native;
 using Aprillz.MewUI.Native.Constants;
+
 using static Aprillz.MewUI.Native.Dwmapi;
 
 namespace Aprillz.MewUI.Platform.Win32;

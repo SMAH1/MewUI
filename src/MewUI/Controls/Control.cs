@@ -327,24 +327,6 @@ public abstract class Control : FrameworkElement, IDisposable
         return baseBorder;
     }
 
-    protected void DrawFocusGlow(IGraphicsContext context, Rect bounds, double radiusDip, double thicknessDip, byte alpha = 0x44, double expandDip = 1)
-    {
-        var theme = GetTheme();
-        var outer = bounds.Inflate(expandDip, expandDip);
-        var dpiScale = GetDpi() / 96.0;
-        var radius = radiusDip <= 0 ? 0 : LayoutRounding.RoundToPixel(radiusDip + expandDip, dpiScale);
-        var stroke = thicknessDip <= 0 ? 1 : LayoutRounding.SnapThicknessToPixels(thicknessDip, dpiScale, 1) + 2;
-        outer = GetSnappedBorderBounds(outer);
-        if (radius > 0)
-        {
-            context.DrawRoundedRectangle(outer, radius, radius, theme.Palette.Accent.WithAlpha(alpha), stroke);
-        }
-        else
-        {
-            context.DrawRectangle(outer, theme.Palette.Accent.WithAlpha(alpha), stroke);
-        }
-    }
-
     /// <summary>
     /// Gets the font using the control's graphics factory.
     /// </summary>

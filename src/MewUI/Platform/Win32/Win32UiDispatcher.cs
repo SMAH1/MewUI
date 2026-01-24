@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 using Aprillz.MewUI.Native;
 using Aprillz.MewUI.Native.Constants;
 
