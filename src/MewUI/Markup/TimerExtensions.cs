@@ -20,7 +20,7 @@ public static class TimerExtensions
         ArgumentNullException.ThrowIfNull(timer);
         ArgumentNullException.ThrowIfNull(handler);
 
-        timer.Tick += (_, _) => handler();
+        timer.Tick += () => handler();
         return timer;
     }
 

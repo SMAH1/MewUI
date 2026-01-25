@@ -27,10 +27,10 @@ public sealed class Application
     private readonly List<Window> _windows = new();
 
     /// <summary>
-    /// Raised when an exception escapes from the platform message loop or window procedure.
-    /// Set <see cref="UiUnhandledExceptionEventArgs.Handled"/> to true to continue.
+    /// Raised when an exception escapes from the UI dispatcher work queue.
+    /// Set <see cref="DispatcherUnhandledExceptionEventArgs.Handled"/> to true to continue.
     /// </summary>
-    public static event EventHandler<UiUnhandledExceptionEventArgs>? UiUnhandledException;
+    public event Action<DispatcherUnhandledExceptionEventArgs>? DispatcherUnhandledException;
 
     /// <summary>
     /// Gets the current application instance.
@@ -241,12 +241,12 @@ public sealed class Application
         _ => OperatingSystem.IsWindows() ? Direct2DGraphicsFactory.Instance : OpenGLGraphicsFactory.Instance,
     };
 
-    internal static bool TryHandleUiException(Exception ex)
+    public bool TryHandleDispatcherException(Exception ex)
     {
         try
         {
-            var args = new UiUnhandledExceptionEventArgs(ex);
-            UiUnhandledException?.Invoke(null, args);
+            var args = new DispatcherUnhandledExceptionEventArgs(ex);
+            DispatcherUnhandledException?.Invoke(args);
             return args.Handled;
         }
         catch
@@ -256,7 +256,7 @@ public sealed class Application
         }
     }
 
-    internal static void NotifyFatalUiException(Exception ex)
+    public void NotifyFatalDispatcherException(Exception ex)
         => Interlocked.CompareExchange(ref _pendingFatalException, ex, null);
 
     private static IPlatformHost CreateDefaultPlatformHost()

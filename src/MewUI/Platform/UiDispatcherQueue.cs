@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 
+using Aprillz.MewUI;
+
 namespace Aprillz.MewUI.Platform;
 
 internal sealed class UiDispatcherQueue
@@ -77,6 +79,24 @@ internal sealed class UiDispatcherQueue
                 try
                 {
                     item.Action();
+                }
+                catch (Exception ex)
+                {
+                    // Dispatcher-level exception handling:
+                    // - If the app handler marks it as handled, continue processing.
+                    // - Otherwise, record fatal and request shutdown to unwind the message loop.
+                    if (Application.IsRunning && Application.Current.TryHandleDispatcherException(ex))
+                    {
+                        continue;
+                    }
+
+                    if (Application.IsRunning)
+                    {
+                        Application.Current.NotifyFatalDispatcherException(ex);
+                        Application.Quit();
+                    }
+
+                    return;
                 }
                 finally
                 {

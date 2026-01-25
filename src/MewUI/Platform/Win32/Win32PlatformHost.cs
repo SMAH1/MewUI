@@ -84,12 +84,9 @@ public sealed class Win32PlatformHost : IPlatformHost
                 }
                 catch (Exception ex)
                 {
-                    if (Application.TryHandleUiException(ex))
-                    {
-                        continue;
-                    }
-
-                    Application.NotifyFatalUiException(ex);
+                    // Avoid letting managed exceptions escape into the native message loop.
+                    // Dispatcher-level handling is performed by the dispatcher queue.
+                    app.NotifyFatalDispatcherException(ex);
                     _running = false;
                     User32.PostQuitMessage(0);
                     break;
@@ -120,12 +117,10 @@ public sealed class Win32PlatformHost : IPlatformHost
             }
             catch (Exception ex)
             {
-                if (Application.TryHandleUiException(ex))
+                if (Application.IsRunning)
                 {
-                    continue;
+                    Application.Current.NotifyFatalDispatcherException(ex);
                 }
-
-                Application.NotifyFatalUiException(ex);
                 _running = false;
                 User32.PostQuitMessage(0);
                 break;
@@ -191,12 +186,7 @@ public sealed class Win32PlatformHost : IPlatformHost
             }
             catch (Exception ex)
             {
-                if (Application.TryHandleUiException(ex))
-                {
-                    return 0;
-                }
-
-                Application.NotifyFatalUiException(ex);
+                Application.Current.NotifyFatalDispatcherException(ex);
                 _running = false;
                 User32.PostQuitMessage(0);
                 return 0;

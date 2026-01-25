@@ -20,7 +20,7 @@ public sealed class DispatcherTimer : IDisposable
         Interval = interval;
     }
 
-    public event EventHandler? Tick;
+    public event Action? Tick;
 
     public bool IsEnabled
     {
@@ -149,7 +149,7 @@ public sealed class DispatcherTimer : IDisposable
             _scheduled = null;
         }
 
-        Tick?.Invoke(this, EventArgs.Empty);
+        Tick?.Invoke();
 
         lock (_gate)
         {

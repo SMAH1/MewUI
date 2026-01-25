@@ -11,7 +11,7 @@ double loadedMs = -1;
 double firstFrameMs = -1;
 var metricsText = new ObservableValue<string>("Metrics:");
 var metricsTimer = new DispatcherTimer(TimeSpan.FromSeconds(2));
-metricsTimer.Tick += (_, _) => UpdateMetrics(appendLog: false);
+metricsTimer.Tick += () => UpdateMetrics(appendLog: false);
 
 Window window;
 var accentSwatches = new List<(Accent accent, Button button)>();
@@ -934,7 +934,7 @@ static void Startup(string[] args, out bool isBench, out bool isSmoke)
         useOpenGl ? GraphicsBackend.OpenGL :
         OperatingSystem.IsWindows() ? GraphicsBackend.Direct2D : GraphicsBackend.OpenGL;
 
-    Application.UiUnhandledException += (_, e) =>
+    Application.Current.DispatcherUnhandledException += e =>
     {
         Log($"UI exception: {e.Exception.GetType().Name}: {e.Exception.Message}");
         Log(e.Exception.ToString());

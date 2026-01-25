@@ -14,6 +14,7 @@ namespace Aprillz.MewUI.Platform.Linux.X11;
 public sealed class X11PlatformHost : IPlatformHost
 {
     private readonly Dictionary<nint, X11WindowBackend> _windows = new();
+    private readonly List<X11WindowBackend> _renderBackends = new(capacity: 8);
     private readonly IMessageBoxService _messageBox = new X11MessageBoxService();
     private readonly IFileDialogService _fileDialog = new X11FileDialogService();
     private readonly IClipboardService _clipboard = new LinuxClipboardService();
@@ -114,19 +115,12 @@ public sealed class X11PlatformHost : IPlatformHost
                 _dispatcher?.ProcessWorkItems();
 
                 // Coalesced rendering for all windows.
-                foreach (var backend in _windows.Values.ToArray())
-                {
-                    backend.RenderIfNeeded();
-                }
+                RenderInvalidatedWindows();
             }
             catch (Exception ex)
             {
-                if (Application.TryHandleUiException(ex))
-                {
-                    continue;
-                }
-
-                Application.NotifyFatalUiException(ex);
+                // Dispatcher-level handling is performed by the dispatcher queue.
+                app.NotifyFatalDispatcherException(ex);
                 _running = false;
                 break;
             }
@@ -202,10 +196,7 @@ public sealed class X11PlatformHost : IPlatformHost
 
         _dispatcher?.ProcessWorkItems();
 
-        foreach (var backend in _windows.Values.ToArray())
-        {
-            backend.RenderIfNeeded();
-        }
+        RenderInvalidatedWindows();
     }
 
     public void Dispose()
@@ -368,6 +359,33 @@ public sealed class X11PlatformHost : IPlatformHost
         }
 
         return false;
+    }
+
+    private void RenderInvalidatedWindows()
+    {
+        if (_windows.Count == 0)
+        {
+            return;
+        }
+
+        if (!AnyWindowNeedsRender())
+        {
+            return;
+        }
+
+        _renderBackends.Clear();
+        foreach (var backend in _windows.Values)
+        {
+            if (backend.NeedsRender)
+            {
+                _renderBackends.Add(backend);
+            }
+        }
+
+        for (int i = 0; i < _renderBackends.Count; i++)
+        {
+            _renderBackends[i].RenderIfNeeded();
+        }
     }
 
     private void WaitForWorkOrEvents()

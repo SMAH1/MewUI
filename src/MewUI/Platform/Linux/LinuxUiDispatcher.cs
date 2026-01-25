@@ -121,11 +121,20 @@ internal sealed class LinuxUiDispatcher : SynchronizationContext, IUiDispatcher
                 return true;
             }
 
+            // Only treat timers as "pending work" when they are due now.
+            // Future timers should not prevent the platform host loop from blocking in poll.
+            long now = Stopwatch.GetTimestamp();
             lock (_timersGate)
             {
                 for (int i = 0; i < _timers.Count; i++)
                 {
-                    if (!_timers[i].Canceled)
+                    var timer = _timers[i];
+                    if (timer.Canceled)
+                    {
+                        continue;
+                    }
+
+                    if (timer.DueAtTicks <= now)
                     {
                         return true;
                     }

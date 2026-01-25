@@ -506,7 +506,7 @@ static void Startup()
         Application.DefaultGraphicsBackend = GraphicsBackend.OpenGL;
     }
 
-    Application.UiUnhandledException += (_, e) =>
+    Application.Current.DispatcherUnhandledException += e =>
     {
         try
         {
