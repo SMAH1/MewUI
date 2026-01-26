@@ -13,12 +13,12 @@ public enum ImageScaleQuality
     /// <summary>
     /// Nearest-neighbor sampling (pixelated, sharp).
     /// </summary>
-    NearestNeighbor = 1,
+    Fast = 1,
 
     /// <summary>
     /// Linear sampling.
     /// </summary>
-    Linear = 2,
+    Normal = 2,
 
     /// <summary>
     /// Best quality available (backend-dependent).

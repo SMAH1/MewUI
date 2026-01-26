@@ -711,7 +711,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
         // - Linear => cached bilinear resample
         // - HighQuality => cached prefiltered downscale + bilinear
         var effective = ImageScaleQuality == ImageScaleQuality.Default
-            ? (_imageScaleQuality == ImageScaleQuality.Default ? ImageScaleQuality.Linear : _imageScaleQuality)
+            ? (_imageScaleQuality == ImageScaleQuality.Default ? ImageScaleQuality.Normal : _imageScaleQuality)
             : ImageScaleQuality;
 
         var memDc = Gdi32.CreateCompatibleDC(Hdc);
@@ -724,7 +724,7 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
             int srcW = (int)sourceRect.Width;
             int srcH = (int)sourceRect.Height;
 
-            if (effective == ImageScaleQuality.NearestNeighbor)
+            if (effective == ImageScaleQuality.Fast)
             {
                 // Nearest: rely on GDI stretch + alpha blend (COLORONCOLOR).
                 int oldStretchMode = Gdi32.SetStretchBltMode(Hdc, GdiConstants.COLORONCOLOR);

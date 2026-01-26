@@ -31,7 +31,7 @@ Startup();
 
 var window = new Window()
     .Title("MewUI.GraphicsBackendTest")
-    .Fixed(1000, 860)
+    .Size(1000, 800)
     .Content(new GraphicsBackendTestView());
 
 Application.Run(window);

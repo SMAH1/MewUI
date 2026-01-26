@@ -416,7 +416,7 @@ internal sealed unsafe class Direct2DGraphicsContext : IGraphicsContext
 
         var interpolation = ImageScaleQuality switch
         {
-            ImageScaleQuality.NearestNeighbor => D2D1_BITMAP_INTERPOLATION_MODE.NEAREST_NEIGHBOR,
+            ImageScaleQuality.Fast => D2D1_BITMAP_INTERPOLATION_MODE.NEAREST_NEIGHBOR,
             _ => D2D1_BITMAP_INTERPOLATION_MODE.LINEAR,
         };
 

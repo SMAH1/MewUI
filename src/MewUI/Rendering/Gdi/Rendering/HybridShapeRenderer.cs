@@ -818,13 +818,63 @@ internal sealed class HybridShapeRenderer
                     float xLeftOut = cx - xOffOut;
                     float xRightOut = cx + xOffOut;
 
-                    // Sample stroke pixels
-                    int left = Math.Max(0, (int)MathF.Floor(xLeftOut) - 1);
-                    int right = Math.Min(surfaceW - 1, (int)MathF.Ceiling(xRightOut) + 1);
-
-                    for (int px = left; px <= right; px++)
+                    // Sample only where the stroke can exist.
+                    // When an inner ellipse exists, the stroke cross-section is two narrow bands:
+                    // [outerLeft .. innerLeft] and [innerRight .. outerRight]. Sampling the whole outer span is
+                    // unnecessarily expensive for wide ellipses.
+                    if (innerSdf != null && rxIn > 0 && ryIn > 0)
                     {
-                        alphaRow[px] = sampler.SampleStrokeEdge(px, py, outerSdf, innerSdf);
+                        float tIn = 1f - (dy * dy) / (ryIn * ryIn);
+                        if (tIn > 0)
+                        {
+                            float xOffIn = rxIn * MathF.Sqrt(tIn);
+                            float xLeftIn = cx - xOffIn;
+                            float xRightIn = cx + xOffIn;
+
+                            int leftBandStart = Math.Max(0, (int)MathF.Floor(xLeftOut) - 1);
+                            int leftBandEnd = Math.Min(surfaceW - 1, (int)MathF.Ceiling(xLeftIn) + 1);
+
+                            int rightBandStart = Math.Max(0, (int)MathF.Floor(xRightIn) - 1);
+                            int rightBandEnd = Math.Min(surfaceW - 1, (int)MathF.Ceiling(xRightOut) + 1);
+
+                            if (leftBandEnd >= leftBandStart)
+                            {
+                                for (int px = leftBandStart; px <= leftBandEnd; px++)
+                                {
+                                    alphaRow[px] = sampler.SampleStrokeEdge(px, py, outerSdf, innerSdf);
+                                }
+                            }
+
+                            if (rightBandEnd >= rightBandStart)
+                            {
+                                for (int px = rightBandStart; px <= rightBandEnd; px++)
+                                {
+                                    alphaRow[px] = sampler.SampleStrokeEdge(px, py, outerSdf, innerSdf);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // No inner hole at this Y; fall back to sampling the outer span (typically narrow here).
+                            int left = Math.Max(0, (int)MathF.Floor(xLeftOut) - 1);
+                            int right = Math.Min(surfaceW - 1, (int)MathF.Ceiling(xRightOut) + 1);
+
+                            for (int px = left; px <= right; px++)
+                            {
+                                alphaRow[px] = sampler.SampleStrokeEdge(px, py, outerSdf, innerSdf);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // No inner ellipse; sample the outer span.
+                        int left = Math.Max(0, (int)MathF.Floor(xLeftOut) - 1);
+                        int right = Math.Min(surfaceW - 1, (int)MathF.Ceiling(xRightOut) + 1);
+
+                        for (int px = left; px <= right; px++)
+                        {
+                            alphaRow[px] = sampler.SampleStrokeEdge(px, py, outerSdf, innerSdf);
+                        }
                     }
 
                     byte* rowPtr = basePtr + py * stride;

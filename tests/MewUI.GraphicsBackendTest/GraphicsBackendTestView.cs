@@ -45,9 +45,10 @@ internal sealed class GraphicsBackendTestCanvas : Control
 
     private readonly List<TestCase> _tests = new();
     private IImage? _image;
+    private IImage? _logo;
 
     private const double CardMinWidth = 240;
-    private const double CardHeight = 190;
+    private const double CardHeight = 220;
     private const double CardGap = 12;
     private const double HeaderHeight = 24;
 
@@ -210,7 +211,6 @@ internal sealed class GraphicsBackendTestCanvas : Control
                 return;
             }
 
-
             var dest = new Rect(r.X + 10, r.Y + 10, 80, 80);
             g.DrawImage(_image, dest);
             g.DrawRectangle(dest, border, 1);
@@ -222,6 +222,118 @@ internal sealed class GraphicsBackendTestCanvas : Control
 
             g.DrawText("april.jpg", new Rect(r.X + 10, r.Y + 95, 155, 30), GetFont(), GetTheme().Palette.WindowText,
                 TextAlignment.Left, TextAlignment.Center, TextWrapping.NoWrap);
+        }));
+
+        _tests.Add(new TestCase("Image ScaleQuality Down (aligned/fractional)", (g, r) =>
+        {
+            EnsureLogo(g);
+            if (_logo == null)
+            {
+                return;
+            }
+
+            using var measure = BeginTextMeasurement();
+            var font = measure.Font;
+
+            var modes = new[]
+            {
+                ImageScaleQuality.Fast,
+                ImageScaleQuality.Normal,
+                ImageScaleQuality.HighQuality,
+            };
+
+            double colW = r.Width / 3;
+            double rowH = r.Height / 2;
+            double pad = 6;
+            double thumb = Math.Max(10, Math.Min(44, Math.Min(colW, rowH) - pad * 2 - 14));
+
+            var srcAligned = new Rect(30, 30, 160, 160);
+            var srcFractional = new Rect(30.25, 30.75, 160.5, 159.5);
+
+            for (int col = 0; col < 3; col++)
+            {
+                var colRect = new Rect(r.X + col * colW, r.Y, colW, r.Height);
+
+                g.DrawText(modes[col].ToString(), new Rect(colRect.X + 2, colRect.Y, colRect.Width - 4, 14),
+                    font, GetTheme().Palette.WindowText, TextAlignment.Center, TextAlignment.Center, TextWrapping.NoWrap);
+
+
+                var cell = new Rect(colRect.X, colRect.Y + 16, colRect.Width, rowH - 16);
+
+                var destAligned = new Rect(cell.X + pad, cell.Y + pad, thumb, thumb);
+
+                var destFractional = new Rect(cell.X + pad, cell.Y + pad + rowH, thumb, thumb);
+
+                var prev = g.ImageScaleQuality;
+                g.ImageScaleQuality = modes[col];
+                try
+                {
+                    g.DrawImage(_logo, destAligned, srcAligned);
+                    g.DrawRectangle(destAligned, border.WithAlpha(0xCC), 1);
+
+                    g.DrawImage(_logo, destFractional, srcFractional);
+                    g.DrawRectangle(destFractional, border.WithAlpha(0xCC), 1);
+                }
+                finally
+                {
+                    g.ImageScaleQuality = prev;
+                }
+            }
+        }));
+        _tests.Add(new TestCase("Image ScaleQuality Up (aligned/fractional)", (g, r) =>
+        {
+            EnsureLogo(g);
+            if (_logo == null)
+            {
+                return;
+            }
+
+            using var measure = BeginTextMeasurement();
+            var font = measure.Font;
+
+            var modes = new[]
+            {
+                ImageScaleQuality.Fast,
+                ImageScaleQuality.Normal,
+                ImageScaleQuality.HighQuality,
+            };
+
+            double colW = r.Width / 3;
+            double rowH = r.Height / 2;
+            double pad = 6;
+            double thumb = Math.Max(10, Math.Min(44, Math.Min(colW, rowH) - pad * 2 - 14));
+
+            var srcAligned = new Rect(30, 30, 160, 160);
+            var srcFractional = new Rect(30.25, 30.75, 160.5, 159.5);
+
+            for (int col = 0; col < 3; col++)
+            {
+                var colRect = new Rect(r.X + col * colW, r.Y, colW, r.Height);
+
+                g.DrawText(modes[col].ToString(), new Rect(colRect.X + 2, colRect.Y, colRect.Width - 4, 14),
+                    font, GetTheme().Palette.WindowText, TextAlignment.Center, TextAlignment.Center, TextWrapping.NoWrap);
+
+                var cell = new Rect(colRect.X, colRect.Y + 16, colRect.Width, rowH - 16);
+
+                var destAligned = new Rect(cell.X + pad, cell.Y + pad, thumb * 1.5, thumb * 1.5); // upscale (src < dest)
+
+                var destFractional = new Rect(cell.X + pad, cell.Y + pad + rowH, thumb * 1.5, thumb * 1.5);
+
+                var prev = g.ImageScaleQuality;
+                g.ImageScaleQuality = modes[col];
+                try
+                {
+                    g.DrawImage(_logo, destAligned, srcAligned);
+                    g.DrawRectangle(destAligned, border.WithAlpha(0xCC), 1);
+
+                    g.DrawImage(_logo, destFractional, srcFractional);
+                    g.DrawRectangle(destFractional, border.WithAlpha(0xCC), 1);
+                }
+                finally
+                {
+                    g.ImageScaleQuality = prev;
+                }
+            }
         }));
     }
 
@@ -237,6 +349,17 @@ internal sealed class GraphicsBackendTestCanvas : Control
         _image = source.CreateImage(Application.Current.GraphicsFactory);
     }
 
+    private void EnsureLogo(IGraphicsContext g)
+    {
+        if (_logo != null)
+        {
+            return;
+        }
+
+        // Use an embedded resource so the test app is self-contained.
+        var source = ImageSource.FromResource(Assembly.GetExecutingAssembly(), "Aprillz.MewUI.GraphicsBackendTest.logo_c-256.png");
+        _logo = source.CreateImage(Application.Current.GraphicsFactory);
+    }
     protected override Size MeasureContent(Size availableSize)
     {
         double width = double.IsPositiveInfinity(availableSize.Width) ? 900 : Math.Max(0, availableSize.Width);

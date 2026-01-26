@@ -760,7 +760,7 @@ internal sealed class OpenGLGraphicsContext : IGraphicsContext
         uint minFilter;
         uint magFilter;
 
-        if (ImageScaleQuality == ImageScaleQuality.NearestNeighbor)
+        if (ImageScaleQuality == ImageScaleQuality.Fast)
         {
             minFilter = GL.GL_NEAREST;
             magFilter = GL.GL_NEAREST;

@@ -161,14 +161,14 @@ internal sealed class GdiImage : IImage
         }
 
         // This cache is only intended for resampling paths. Nearest-neighbor uses GDI stretch directly.
-        if (quality == ImageScaleQuality.NearestNeighbor)
+        if (quality == ImageScaleQuality.Fast)
         {
             return false;
         }
 
         if (quality == ImageScaleQuality.Default)
         {
-            quality = ImageScaleQuality.Linear;
+            quality = ImageScaleQuality.Normal;
         }
 
         // Clamp to image bounds.
