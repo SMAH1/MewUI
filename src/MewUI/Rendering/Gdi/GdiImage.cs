@@ -161,7 +161,12 @@ internal sealed class GdiImage : IImage
         }
 
         // This cache is only intended for resampling paths. Nearest-neighbor uses GDI stretch directly.
-        if (quality == ImageScaleQuality.Default || quality == ImageScaleQuality.NearestNeighbor)
+        if (quality == ImageScaleQuality.NearestNeighbor)
+        {
+            return false;
+        }
+
+        if (quality == ImageScaleQuality.Default)
         {
             quality = ImageScaleQuality.Linear;
         }
@@ -330,27 +335,41 @@ internal sealed class GdiImage : IImage
                             }
                         }
 
-                        // Bilinear sampling (premultiplied BGRA).
+                        // Sampling (premultiplied BGRA):
+                        // - Linear => bilinear
+                        // - HighQuality => bilinear (downscale after prefilter) or bicubic (upscale)
                         float scaleX = (float)workW / destW;
                         float scaleY = (float)workH / destH;
 
-                        int[] x0Arr = System.Buffers.ArrayPool<int>.Shared.Rent(destW);
-                        int[] x1Arr = System.Buffers.ArrayPool<int>.Shared.Rent(destW);
-                        float[] wxArr = System.Buffers.ArrayPool<float>.Shared.Rent(destW);
+                        bool useBicubic = quality == ImageScaleQuality.HighQuality && (destW > workW || destH > workH);
+
+                        int[]? x0Arr = null;
+                        int[]? x1Arr = null;
+                        float[]? wxArr = null;
+
+                        if (!useBicubic)
+                        {
+                            x0Arr = System.Buffers.ArrayPool<int>.Shared.Rent(destW);
+                            x1Arr = System.Buffers.ArrayPool<int>.Shared.Rent(destW);
+                            wxArr = System.Buffers.ArrayPool<float>.Shared.Rent(destW);
+                        }
 
                         try
                         {
-                            for (int dx = 0; dx < destW; dx++)
+                            if (!useBicubic)
                             {
-                                float sx = (dx + 0.5f) * scaleX - 0.5f;
-                                int x0 = (int)MathF.Floor(sx);
-                                float wx = sx - x0;
-                                if (x0 < 0) { x0 = 0; wx = 0; }
-                                int x1 = Math.Min(workW - 1, x0 + 1);
+                                for (int dx = 0; dx < destW; dx++)
+                                {
+                                    float sx = (dx + 0.5f) * scaleX - 0.5f;
+                                    int x0 = (int)MathF.Floor(sx);
+                                    float wx = sx - x0;
+                                    if (x0 < 0) { x0 = 0; wx = 0; }
+                                    int x1 = Math.Min(workW - 1, x0 + 1);
 
-                                x0Arr[dx] = x0;
-                                x1Arr[dx] = x1;
-                                wxArr[dx] = wx;
+                                    x0Arr![dx] = x0;
+                                    x1Arr![dx] = x1;
+                                    wxArr![dx] = wx;
+                                }
                             }
 
                             for (int dy = 0; dy < destH; dy++)
@@ -361,47 +380,149 @@ internal sealed class GdiImage : IImage
                                 if (y0 < 0) { y0 = 0; wy = 0; }
                                 int y1 = Math.Min(workH - 1, y0 + 1);
 
-                                float wy0 = 1 - wy;
-
                                 byte* dstRow = dstBase + dy * destW * 4;
                                 byte* row0 = workSrc + y0 * workStrideBytes;
                                 byte* row1 = workSrc + y1 * workStrideBytes;
 
+                                if (!useBicubic)
+                                {
+                                    float wy0 = 1 - wy;
+
+                                    for (int dx = 0; dx < destW; dx++)
+                                    {
+                                        int x0 = x0Arr![dx];
+                                        int x1 = x1Arr![dx];
+                                        float wx = wxArr![dx];
+                                        float wx0 = 1 - wx;
+
+                                        byte* p00 = row0 + x0 * 4;
+                                        byte* p10 = row0 + x1 * 4;
+                                        byte* p01 = row1 + x0 * 4;
+                                        byte* p11 = row1 + x1 * 4;
+
+                                        float w00 = wx0 * wy0;
+                                        float w10 = wx * wy0;
+                                        float w01 = wx0 * wy;
+                                        float w11 = wx * wy;
+
+                                        float b = p00[0] * w00 + p10[0] * w10 + p01[0] * w01 + p11[0] * w11;
+                                        float g = p00[1] * w00 + p10[1] * w10 + p01[1] * w01 + p11[1] * w11;
+                                        float r = p00[2] * w00 + p10[2] * w10 + p01[2] * w01 + p11[2] * w11;
+                                        float a = p00[3] * w00 + p10[3] * w10 + p01[3] * w01 + p11[3] * w11;
+
+                                        dstRow[0] = (byte)Math.Clamp((int)MathF.Round(b), 0, 255);
+                                        dstRow[1] = (byte)Math.Clamp((int)MathF.Round(g), 0, 255);
+                                        dstRow[2] = (byte)Math.Clamp((int)MathF.Round(r), 0, 255);
+                                        dstRow[3] = (byte)Math.Clamp((int)MathF.Round(a), 0, 255);
+                                        dstRow += 4;
+                                    }
+
+                                    continue;
+                                }
+
+                                // Bicubic (Catmull-Rom, a = -0.5). More expensive, but produces smoother upscales.
+                                static float Cubic(float x)
+                                {
+                                    x = MathF.Abs(x);
+                                    const float a = -0.5f;
+
+                                    if (x <= 1f)
+                                    {
+                                        return (a + 2f) * x * x * x - (a + 3f) * x * x + 1f;
+                                    }
+
+                                    if (x < 2f)
+                                    {
+                                        return a * x * x * x - 5f * a * x * x + 8f * a * x - 4f * a;
+                                    }
+
+                                    return 0f;
+                                }
+
+                                float syBase = (dy + 0.5f) * scaleY - 0.5f;
+                                int iy = (int)MathF.Floor(syBase);
+                                float ty = syBase - iy;
+
+                                int y_1 = Math.Clamp(iy - 1, 0, workH - 1);
+                                int y0c = Math.Clamp(iy + 0, 0, workH - 1);
+                                int y1c = Math.Clamp(iy + 1, 0, workH - 1);
+                                int y2c = Math.Clamp(iy + 2, 0, workH - 1);
+
+                                float wy_1 = Cubic(1f + ty);
+                                float wy0c = Cubic(0f + ty);
+                                float wy1c = Cubic(1f - ty);
+                                float wy2c = Cubic(2f - ty);
+
+                                byte* row_1 = workSrc + y_1 * workStrideBytes;
+                                byte* row0c = workSrc + y0c * workStrideBytes;
+                                byte* row1c = workSrc + y1c * workStrideBytes;
+                                byte* row2c = workSrc + y2c * workStrideBytes;
+
                                 for (int dx = 0; dx < destW; dx++)
                                 {
-                                    int x0 = x0Arr[dx];
-                                    int x1 = x1Arr[dx];
-                                    float wx = wxArr[dx];
-                                    float wx0 = 1 - wx;
+                                    float sxBase = (dx + 0.5f) * scaleX - 0.5f;
+                                    int ix = (int)MathF.Floor(sxBase);
+                                    float tx = sxBase - ix;
 
-                                    byte* p00 = row0 + x0 * 4;
-                                    byte* p10 = row0 + x1 * 4;
-                                    byte* p01 = row1 + x0 * 4;
-                                    byte* p11 = row1 + x1 * 4;
+                                    int x_1 = Math.Clamp(ix - 1, 0, workW - 1);
+                                    int x0c = Math.Clamp(ix + 0, 0, workW - 1);
+                                    int x1c = Math.Clamp(ix + 1, 0, workW - 1);
+                                    int x2c = Math.Clamp(ix + 2, 0, workW - 1);
 
-                                    float w00 = wx0 * wy0;
-                                    float w10 = wx * wy0;
-                                    float w01 = wx0 * wy;
-                                    float w11 = wx * wy;
+                                    float wx_1 = Cubic(1f + tx);
+                                    float wx0c = Cubic(0f + tx);
+                                    float wx1c = Cubic(1f - tx);
+                                    float wx2c = Cubic(2f - tx);
 
-                                    float b = p00[0] * w00 + p10[0] * w10 + p01[0] * w01 + p11[0] * w11;
-                                    float g = p00[1] * w00 + p10[1] * w10 + p01[1] * w01 + p11[1] * w11;
-                                    float r = p00[2] * w00 + p10[2] * w10 + p01[2] * w01 + p11[2] * w11;
-                                    float a = p00[3] * w00 + p10[3] * w10 + p01[3] * w01 + p11[3] * w11;
+                                    float sumB = 0, sumG = 0, sumR = 0, sumA = 0;
 
-                                    dstRow[0] = (byte)Math.Clamp((int)MathF.Round(b), 0, 255);
-                                    dstRow[1] = (byte)Math.Clamp((int)MathF.Round(g), 0, 255);
-                                    dstRow[2] = (byte)Math.Clamp((int)MathF.Round(r), 0, 255);
-                                    dstRow[3] = (byte)Math.Clamp((int)MathF.Round(a), 0, 255);
+                                    void Accumulate(byte* row, float wyw)
+                                    {
+                                        byte* p0 = row + x_1 * 4;
+                                        byte* p1 = row + x0c * 4;
+                                        byte* p2 = row + x1c * 4;
+                                        byte* p3 = row + x2c * 4;
+
+                                        float w0 = wx_1 * wyw;
+                                        float w1 = wx0c * wyw;
+                                        float w2 = wx1c * wyw;
+                                        float w3 = wx2c * wyw;
+
+                                        sumB += p0[0] * w0 + p1[0] * w1 + p2[0] * w2 + p3[0] * w3;
+                                        sumG += p0[1] * w0 + p1[1] * w1 + p2[1] * w2 + p3[1] * w3;
+                                        sumR += p0[2] * w0 + p1[2] * w1 + p2[2] * w2 + p3[2] * w3;
+                                        sumA += p0[3] * w0 + p1[3] * w1 + p2[3] * w2 + p3[3] * w3;
+                                    }
+
+                                    Accumulate(row_1, wy_1);
+                                    Accumulate(row0c, wy0c);
+                                    Accumulate(row1c, wy1c);
+                                    Accumulate(row2c, wy2c);
+
+                                    dstRow[0] = (byte)Math.Clamp((int)MathF.Round(sumB), 0, 255);
+                                    dstRow[1] = (byte)Math.Clamp((int)MathF.Round(sumG), 0, 255);
+                                    dstRow[2] = (byte)Math.Clamp((int)MathF.Round(sumR), 0, 255);
+                                    dstRow[3] = (byte)Math.Clamp((int)MathF.Round(sumA), 0, 255);
                                     dstRow += 4;
                                 }
                             }
                         }
                         finally
                         {
-                            System.Buffers.ArrayPool<int>.Shared.Return(x0Arr);
-                            System.Buffers.ArrayPool<int>.Shared.Return(x1Arr);
-                            System.Buffers.ArrayPool<float>.Shared.Return(wxArr);
+                            if (x0Arr != null)
+                            {
+                                System.Buffers.ArrayPool<int>.Shared.Return(x0Arr);
+                            }
+
+                            if (x1Arr != null)
+                            {
+                                System.Buffers.ArrayPool<int>.Shared.Return(x1Arr);
+                            }
+
+                            if (wxArr != null)
+                            {
+                                System.Buffers.ArrayPool<float>.Shared.Return(wxArr);
+                            }
                         }
                     }
                     finally

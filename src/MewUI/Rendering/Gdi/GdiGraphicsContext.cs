@@ -749,10 +749,38 @@ internal sealed class GdiGraphicsContext : IGraphicsContext
 
             // Linear/HighQuality: try cached scaled bitmap for deterministic, backend-independent resampling.
             // This trades memory for speed when the same image is drawn repeatedly at the same scaled size
-            // (common in UI). Only used when sourceRect is pixel-aligned.
-            if (IsNearInt(sourceRect.X) && IsNearInt(sourceRect.Y) &&
-                IsNearInt(sourceRect.Width) && IsNearInt(sourceRect.Height) &&
-                gdiImage.TryGetOrCreateScaledBitmap(srcX, srcY, srcW, srcH, destPx.Width, destPx.Height, effective, out var scaledBmp))
+            // (common in UI).
+            //
+            // For HighQuality, allow rounding the source rect to whole pixels so ViewBox/UniformToFill
+            // cases can still take the resample-cache path (otherwise we'd fall back to GDI stretch).
+            bool srcAligned =
+                IsNearInt(sourceRect.X) && IsNearInt(sourceRect.Y) &&
+                IsNearInt(sourceRect.Width) && IsNearInt(sourceRect.Height);
+
+            int scaledSrcX = srcX;
+            int scaledSrcY = srcY;
+            int scaledSrcW = srcW;
+            int scaledSrcH = srcH;
+
+            if (!srcAligned && effective == ImageScaleQuality.HighQuality)
+            {
+                int left = (int)Math.Round(sourceRect.X);
+                int top = (int)Math.Round(sourceRect.Y);
+                int right = (int)Math.Round(sourceRect.Right);
+                int bottom = (int)Math.Round(sourceRect.Bottom);
+
+                if (right > left && bottom > top)
+                {
+                    scaledSrcX = left;
+                    scaledSrcY = top;
+                    scaledSrcW = right - left;
+                    scaledSrcH = bottom - top;
+                    srcAligned = true;
+                }
+            }
+
+            if (srcAligned &&
+                gdiImage.TryGetOrCreateScaledBitmap(scaledSrcX, scaledSrcY, scaledSrcW, scaledSrcH, destPx.Width, destPx.Height, effective, out var scaledBmp))
             {
                 var scaledDc = Gdi32.CreateCompatibleDC(Hdc);
                 var oldScaled = Gdi32.SelectObject(scaledDc, scaledBmp);
