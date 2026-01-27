@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file contains the inverse-DCT management logic.
  * This code selects a particular IDCT implementation to be used,
  * and it performs related housekeeping chores.  No code in this file
@@ -8,8 +8,6 @@
  * dequantization as well as the IDCT proper.  This module sets up the
  * dequantization multiplier table needed by the IDCT routine.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file contains code for merged upsampling/color conversion.
  *
  * This file combines functions from my_upsampler and jpeg_color_deconverter;
@@ -25,8 +25,6 @@
  * the only common cases.  (For uncommon cases we fall back on the more
  * general code in my_upsampler and jpeg_color_deconverter)
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

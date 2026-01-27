@@ -1,10 +1,8 @@
-﻿/*
+/*
  * This file contains input control logic for the JPEG decompressor.
  * These routines are concerned with controlling the decompressor's input
  * processing (marker reading and coefficient decoding).
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

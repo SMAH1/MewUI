@@ -1,12 +1,10 @@
-﻿/*
+/*
  * This file contains routines to decode JPEG datastream markers.
  * Most of the complexity arises from our desire to support input
  * suspension: if not all of the data for a marker is available,
  * we must exit back to the application.  On resumption, we reprocess
  * the marker.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

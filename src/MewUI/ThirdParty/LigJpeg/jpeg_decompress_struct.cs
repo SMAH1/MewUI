@@ -1,6 +1,3 @@
-﻿using System.IO;
-
-using System;
 using BitMiracle.LibJpeg.Classic.Internal;
 
 namespace BitMiracle.LibJpeg.Classic;
@@ -81,7 +78,6 @@ public class jpeg_decompress_struct : jpeg_common_struct
     internal int m_data_precision;     /* bits of precision in image data */
 
     /* m_comp_info[i] describes component that appears i'th in SOF */
-    private jpeg_component_info[]? m_comp_info;
 
     internal bool is_baseline;		/* TRUE if Baseline SOF0 encountered */
     internal bool m_progressive_mode;  /* true if SOFn specifies progressive mode */
@@ -214,7 +210,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Gets or sets the source for decompression.
     /// </summary>
     /// <value>The source for decompression.</value>
-    public LibJpeg.Classic.jpeg_source_mgr Src
+    public jpeg_source_mgr Src
     {
         get { return m_src; }
         internal set { m_src = value; }
@@ -224,7 +220,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /* Application may inspect these values to decide how to process image. */
 
     /// <summary>
-    /// Gets the width of image, set by <see cref="jpeg_decompress_struct.jpeg_read_header"/>
+    /// Gets the width of image, set by <see cref="jpeg_read_header"/>
     /// </summary>
     /// <value>The width of image.</value>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
@@ -234,7 +230,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     }
 
     /// <summary>
-    /// Gets the height of image, set by <see cref="jpeg_decompress_struct.jpeg_read_header"/>
+    /// Gets the height of image, set by <see cref="jpeg_read_header"/>
     /// </summary>
     /// <value>The height of image.</value>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
@@ -258,7 +254,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// </summary>
     /// <value>The colorspace of JPEG image.</value>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
-    public LibJpeg.Classic.J_COLOR_SPACE Jpeg_color_space
+    public J_COLOR_SPACE Jpeg_color_space
     {
         get { return m_jpeg_color_space; }
         set { m_jpeg_color_space = value; }
@@ -274,7 +270,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// </summary>
     /// <value>The output color space.</value>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
-    public LibJpeg.Classic.J_COLOR_SPACE Out_color_space
+    public J_COLOR_SPACE Out_color_space
     {
         get { return m_out_color_space; }
         set { m_out_color_space = value; }
@@ -283,13 +279,13 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// <summary>
     /// Gets or sets the numerator of the fraction of image scaling.
     /// </summary>
-    /// <value>Scale the image by the fraction Scale_num/<see cref="jpeg_decompress_struct.Scale_denom">Scale_denom</see>. 
+    /// <value>Scale the image by the fraction Scale_num/<see cref="Scale_denom">Scale_denom</see>. 
     /// Default is 1/1, or no scaling. Currently, the only supported scaling ratios are 1/1, 1/2, 1/4, and 1/8.
     /// (The library design allows for arbitrary scaling ratios but this is not likely to be implemented any time soon.)
     /// </value>
     /// <remarks>Smaller scaling ratios permit significantly faster decoding since fewer pixels 
     /// need to be processed and a simpler <see cref="J_DCT_METHOD">DCT method</see> can be used.</remarks>
-    /// <seealso cref="jpeg_decompress_struct.Scale_denom"/>
+    /// <seealso cref="Scale_denom"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public int Scale_num
     {
@@ -300,13 +296,13 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// <summary>
     /// Gets or sets the denominator of the fraction of image scaling.
     /// </summary>
-    /// <value>Scale the image by the fraction <see cref="jpeg_decompress_struct.Scale_num">Scale_num</see>/Scale_denom. 
+    /// <value>Scale the image by the fraction <see cref="Scale_num">Scale_num</see>/Scale_denom. 
     /// Default is 1/1, or no scaling. Currently, the only supported scaling ratios are 1/1, 1/2, 1/4, and 1/8.
     /// (The library design allows for arbitrary scaling ratios but this is not likely to be implemented any time soon.)
     /// </value>
     /// <remarks>Smaller scaling ratios permit significantly faster decoding since fewer pixels 
     /// need to be processed and a simpler <see cref="J_DCT_METHOD">DCT method</see> can be used.</remarks>
-    /// <seealso cref="jpeg_decompress_struct.Scale_num"/>
+    /// <seealso cref="Scale_num"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public int Scale_denom
     {
@@ -330,7 +326,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// </summary>
     /// <value><c>true</c> if raw data output is enabled; otherwise, <c>false</c>.</value>
     /// <remarks>Default value: <c>false</c><br/>
-    /// Set this to true before <see cref="jpeg_decompress_struct.jpeg_start_decompress"/> 
+    /// Set this to true before <see cref="jpeg_start_decompress"/> 
     /// if you need to obtain raw data output.
     /// </remarks>
     /// <seealso cref="jpeg_read_raw_data"/>
@@ -345,7 +341,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// </summary>
     /// <value>The algorithm used for the DCT step.</value>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
-    public LibJpeg.Classic.J_DCT_METHOD Dct_method
+    public J_DCT_METHOD Dct_method
     {
         get { return m_dct_method; }
         set { m_dct_method = value; }
@@ -402,14 +398,14 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Selects color dithering method.
     /// </summary>
     /// <value>Default value: <see cref="J_DITHER_MODE.JDITHER_FS"/>.</value>
-    /// <remarks>Ignored if <see cref="jpeg_decompress_struct.Quantize_colors"/> is <c>false</c>.<br/>
+    /// <remarks>Ignored if <see cref="Quantize_colors"/> is <c>false</c>.<br/>
     /// At present, ordered dither is implemented only in the single-pass, standard-colormap case. 
-    /// If you ask for ordered dither when <see cref="jpeg_decompress_struct.Two_pass_quantize"/> is <c>true</c>
+    /// If you ask for ordered dither when <see cref="Two_pass_quantize"/> is <c>true</c>
     /// or when you supply an external color map, you'll get F-S dithering.
     /// </remarks>
-    /// <seealso cref="jpeg_decompress_struct.Quantize_colors"/>
+    /// <seealso cref="Quantize_colors"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
-    public LibJpeg.Classic.J_DITHER_MODE Dither_mode
+    public J_DITHER_MODE Dither_mode
     {
         get { return m_dither_mode; }
         set { m_dither_mode = value; }
@@ -424,9 +420,9 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// 
     /// Default value: <c>true</c>
     /// </value>
-    /// <remarks>Ignored if <see cref="jpeg_decompress_struct.Quantize_colors"/> is <c>false</c>.<br/>
+    /// <remarks>Ignored if <see cref="Quantize_colors"/> is <c>false</c>.<br/>
     /// </remarks>
-    /// <seealso cref="jpeg_decompress_struct.Quantize_colors"/>
+    /// <seealso cref="Quantize_colors"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public bool Two_pass_quantize
     {
@@ -438,10 +434,10 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Maximum number of colors to use in generating a library-supplied color map.
     /// </summary>
     /// <value>Default value: 256.</value>
-    /// <remarks>Ignored if <see cref="jpeg_decompress_struct.Quantize_colors"/> is <c>false</c>.<br/>
-    /// The actual number of colors is returned in a <see cref="jpeg_decompress_struct.Actual_number_of_colors"/>.
+    /// <remarks>Ignored if <see cref="Quantize_colors"/> is <c>false</c>.<br/>
+    /// The actual number of colors is returned in a <see cref="Actual_number_of_colors"/>.
     /// </remarks>
-    /// <seealso cref="jpeg_decompress_struct.Quantize_colors"/>
+    /// <seealso cref="Quantize_colors"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public int Desired_number_of_colors
     {
@@ -497,10 +493,10 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Gets the actual width of output image.
     /// </summary>
     /// <value>The width of output image.</value>
-    /// <remarks>Computed by <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.
-    /// You can also use <see cref="jpeg_decompress_struct.jpeg_calc_output_dimensions"/> to determine this value
-    /// in advance of calling <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.</remarks>
-    /// <seealso cref="jpeg_decompress_struct.Output_height"/>
+    /// <remarks>Computed by <see cref="jpeg_start_decompress"/>.
+    /// You can also use <see cref="jpeg_calc_output_dimensions"/> to determine this value
+    /// in advance of calling <see cref="jpeg_start_decompress"/>.</remarks>
+    /// <seealso cref="Output_height"/>
     public int Output_width
     {
         get { return m_output_width; }
@@ -510,23 +506,23 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Gets the actual height of output image.
     /// </summary>
     /// <value>The height of output image.</value>
-    /// <remarks>Computed by <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.
-    /// You can also use <see cref="jpeg_decompress_struct.jpeg_calc_output_dimensions"/> to determine this value
-    /// in advance of calling <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.</remarks>
-    /// <seealso cref="jpeg_decompress_struct.Output_width"/>
+    /// <remarks>Computed by <see cref="jpeg_start_decompress"/>.
+    /// You can also use <see cref="jpeg_calc_output_dimensions"/> to determine this value
+    /// in advance of calling <see cref="jpeg_start_decompress"/>.</remarks>
+    /// <seealso cref="Output_width"/>
     public int Output_height
     {
         get { return m_output_height; }
     }
 
     /// <summary>
-    /// Gets the number of color components in <see cref="jpeg_decompress_struct.Out_color_space"/>.
+    /// Gets the number of color components in <see cref="Out_color_space"/>.
     /// </summary>
-    /// <remarks>Computed by <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.
-    /// You can also use <see cref="jpeg_decompress_struct.jpeg_calc_output_dimensions"/> to determine this value
-    /// in advance of calling <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.</remarks>
+    /// <remarks>Computed by <see cref="jpeg_start_decompress"/>.
+    /// You can also use <see cref="jpeg_calc_output_dimensions"/> to determine this value
+    /// in advance of calling <see cref="jpeg_start_decompress"/>.</remarks>
     /// <value>The number of color components.</value>
-    /// <seealso cref="jpeg_decompress_struct.Out_color_space"/>
+    /// <seealso cref="Out_color_space"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public int Out_color_components
     {
@@ -536,14 +532,14 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// <summary>
     /// Gets the number of color components returned.
     /// </summary>
-    /// <remarks>Computed by <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.
-    /// You can also use <see cref="jpeg_decompress_struct.jpeg_calc_output_dimensions"/> to determine this value
-    /// in advance of calling <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.</remarks>
-    /// <value>When <see cref="jpeg_decompress_struct.Quantize_colors">quantizing colors</see>, 
+    /// <remarks>Computed by <see cref="jpeg_start_decompress"/>.
+    /// You can also use <see cref="jpeg_calc_output_dimensions"/> to determine this value
+    /// in advance of calling <see cref="jpeg_start_decompress"/>.</remarks>
+    /// <value>When <see cref="Quantize_colors">quantizing colors</see>, 
     /// <c>Output_components</c> is 1, indicating a single color map index per pixel. 
-    /// Otherwise it equals to <see cref="jpeg_decompress_struct.Out_color_components"/>.
+    /// Otherwise it equals to <see cref="Out_color_components"/>.
     /// </value>
-    /// <seealso cref="jpeg_decompress_struct.Out_color_space"/>
+    /// <seealso cref="Out_color_space"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public int Output_components
     {
@@ -555,9 +551,9 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// </summary>
     /// <value>In high-quality modes, <c>Rec_outbuf_height</c> is always 1, but some faster, 
     /// lower-quality modes set it to larger values (typically 2 to 4).</value>
-    /// <remarks>Computed by <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.
-    /// You can also use <see cref="jpeg_decompress_struct.jpeg_calc_output_dimensions"/> to determine this value
-    /// in advance of calling <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>.<br/>
+    /// <remarks>Computed by <see cref="jpeg_start_decompress"/>.
+    /// You can also use <see cref="jpeg_calc_output_dimensions"/> to determine this value
+    /// in advance of calling <see cref="jpeg_start_decompress"/>.<br/>
     /// 
     /// <c>Rec_outbuf_height</c> is the recommended minimum height (in scanlines) 
     /// of the buffer passed to <see cref="jpeg_decompress_struct.jpeg_read_scanlines"/>.
@@ -584,7 +580,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// The number of colors in the color map.
     /// </summary>
     /// <value>The number of colors in the color map.</value>
-    /// <seealso cref="jpeg_decompress_struct.Colormap"/>
+    /// <seealso cref="Colormap"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public int Actual_number_of_colors
     {
@@ -593,19 +589,19 @@ public class jpeg_decompress_struct : jpeg_common_struct
     }
 
     /// <summary>
-    /// The color map, represented as a 2-D pixel array of <see cref="jpeg_decompress_struct.Out_color_components"/> rows 
-    /// and <see cref="jpeg_decompress_struct.Actual_number_of_colors"/> columns.
+    /// The color map, represented as a 2-D pixel array of <see cref="Out_color_components"/> rows 
+    /// and <see cref="Actual_number_of_colors"/> columns.
     /// </summary>
-    /// <value>Colormap is set to <c>null</c> by <see cref="jpeg_decompress_struct.jpeg_read_header"/>.
+    /// <value>Colormap is set to <c>null</c> by <see cref="jpeg_read_header"/>.
     /// The application can supply a color map by setting <c>Colormap</c> non-null and setting 
-    /// <see cref="jpeg_decompress_struct.Actual_number_of_colors"/> to the map size.
+    /// <see cref="Actual_number_of_colors"/> to the map size.
     /// </value>
     /// <remarks>Ignored if not quantizing.<br/>
     /// Implementation restriction: at present, an externally supplied <c>Colormap</c>
     /// is only accepted for 3-component output color spaces.
     /// </remarks>
-    /// <seealso cref="jpeg_decompress_struct.Actual_number_of_colors"/>
-    /// <seealso cref="jpeg_decompress_struct.Quantize_colors"/>
+    /// <seealso cref="Actual_number_of_colors"/>
+    /// <seealso cref="Quantize_colors"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public byte[][]? Colormap
     {
@@ -712,8 +708,8 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Gets the resolution information from JFIF marker.
     /// </summary>
     /// <value>The information from JFIF marker.</value>
-    /// <seealso cref="jpeg_decompress_struct.X_density"/>
-    /// <seealso cref="jpeg_decompress_struct.Y_density"/>
+    /// <seealso cref="X_density"/>
+    /// <seealso cref="Y_density"/>
     /// <seealso href="../articles/KB/decompression-parameter-selection.html">Decompression parameter selection</seealso>
     public DensityUnit Density_unit
     {
@@ -724,8 +720,8 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Gets the horizontal component of pixel ratio.
     /// </summary>
     /// <value>The horizontal component of pixel ratio.</value>
-    /// <seealso cref="jpeg_decompress_struct.Y_density"/>
-    /// <seealso cref="jpeg_decompress_struct.Density_unit"/>
+    /// <seealso cref="Y_density"/>
+    /// <seealso cref="Density_unit"/>
     public short X_density
     {
         get { return m_X_density; }
@@ -735,8 +731,8 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Gets the vertical component of pixel ratio.
     /// </summary>
     /// <value>The vertical component of pixel ratio.</value>
-    /// <seealso cref="jpeg_decompress_struct.X_density"/>
-    /// <seealso cref="jpeg_decompress_struct.Density_unit"/>
+    /// <seealso cref="X_density"/>
+    /// <seealso cref="Density_unit"/>
     public short Y_density
     {
         get { return m_Y_density; }
@@ -780,11 +776,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// </summary>
     /// <value>The components in SOF.</value>
     /// <seealso cref="jpeg_component_info"/>
-    public jpeg_component_info[]? Comp_info
-    {
-        get { return m_comp_info; }
-        internal set { m_comp_info = value; }
-    }
+    public jpeg_component_info[]? Comp_info { get; internal set; }
 
     /// <summary>
     /// Sets input stream.
@@ -821,7 +813,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// and will save all tables and parameters in the JPEG object. It will also initialize the
     /// decompression parameters to default values, and finally return <see cref="ReadResult.JPEG_HEADER_OK"/>.
     /// On return, the application may adjust the decompression parameters and then call
-    /// <see cref="jpeg_decompress_struct.jpeg_start_decompress"/>. (Or, if the application only wanted to
+    /// <see cref="jpeg_start_decompress"/>. (Or, if the application only wanted to
     /// determine the image parameters, the data need not be decompressed. In that case, call
     /// <see cref="jpeg_common_struct.jpeg_abort"/> to release any temporary space.)<br/><br/>
     /// 
@@ -885,11 +877,11 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// <returns>Returns <c>false</c> if suspended. The return value need be inspected 
     /// only if a suspending data source is used.
     /// </returns>
-    /// <remarks><see cref="jpeg_decompress_struct.jpeg_read_header">jpeg_read_header</see> must be completed before calling this.<br/>
+    /// <remarks><see cref="jpeg_read_header">jpeg_read_header</see> must be completed before calling this.<br/>
     /// 
     /// If a multipass operating mode was selected, this will do all but the last pass, and thus may take a great deal of time.
     /// </remarks>
-    /// <seealso cref="jpeg_decompress_struct.jpeg_finish_decompress"/>
+    /// <seealso cref="jpeg_finish_decompress"/>
     /// <seealso href="../articles/KB/decompression-details.html">Decompression details</seealso>
     public bool jpeg_start_decompress()
     {
@@ -1040,7 +1032,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// only if a suspending data source is used.
     /// </returns>
     /// <remarks>This will normally just verify the file trailer and release temp storage.</remarks>
-    /// <seealso cref="jpeg_decompress_struct.jpeg_start_decompress"/>
+    /// <seealso cref="jpeg_start_decompress"/>
     /// <seealso href="../articles/KB/decompression-details.html">Decompression details</seealso>
     public bool jpeg_finish_decompress()
     {
@@ -1168,7 +1160,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// <param name="scan_number">Indicates which scan of the input file is to be displayed; 
     /// the scans are numbered starting at 1 for this purpose.</param>
     /// <returns><c>true</c> if done; <c>false</c> if suspended</returns>
-    /// <seealso cref="jpeg_decompress_struct.jpeg_finish_output"/>
+    /// <seealso cref="jpeg_finish_output"/>
     /// <seealso href="../articles/KB/buffered-image-mode.html">Buffered-image mode</seealso>
     public bool jpeg_start_output(int scan_number)
     {
@@ -1197,7 +1189,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// Finish up after an output pass in <see href="../articles/KB/buffered-image-mode.html">buffered-image mode</see>.
     /// </summary>
     /// <returns>Returns <c>false</c> if suspended. The return value need be inspected only if a suspending data source is used.</returns>
-    /// <seealso cref="jpeg_decompress_struct.jpeg_start_output"/>
+    /// <seealso cref="jpeg_start_output"/>
     /// <seealso href="../articles/KB/buffered-image-mode.html">Buffered-image mode</seealso>
     public bool jpeg_finish_output()
     {
@@ -1314,7 +1306,7 @@ public class jpeg_decompress_struct : jpeg_common_struct
         {
             int ssize = 1;
 
-            jpeg_component_info compptr = m_comp_info![ci];
+            jpeg_component_info compptr = Comp_info![ci];
             while (min_DCT_h_scaled_size * ssize <=
                 (m_do_fancy_upsampling ? JpegConstants.DCTSIZE : JpegConstants.DCTSIZE / 2) &&
                 (m_max_h_samp_factor % (compptr.H_samp_factor * ssize * 2)) == 0)
@@ -1350,12 +1342,12 @@ public class jpeg_decompress_struct : jpeg_common_struct
         for (int ci = 0; ci < m_num_components; ci++)
         {
             /* Size in samples, after IDCT scaling */
-            m_comp_info![ci].downsampled_width = (int)JpegUtils.jdiv_round_up(
-                m_image_width * m_comp_info![ci].H_samp_factor * m_comp_info![ci].DCT_h_scaled_size,
+            Comp_info![ci].downsampled_width = (int)JpegUtils.jdiv_round_up(
+                m_image_width * Comp_info![ci].H_samp_factor * Comp_info![ci].DCT_h_scaled_size,
                 m_max_h_samp_factor * block_size);
 
-            m_comp_info![ci].downsampled_height = (int)JpegUtils.jdiv_round_up(
-                m_image_height * m_comp_info![ci].V_samp_factor * m_comp_info![ci].DCT_v_scaled_size,
+            Comp_info![ci].downsampled_height = (int)JpegUtils.jdiv_round_up(
+                m_image_height * Comp_info![ci].V_samp_factor * Comp_info![ci].DCT_v_scaled_size,
                 m_max_v_samp_factor * block_size);
         }
 
@@ -1408,15 +1400,15 @@ public class jpeg_decompress_struct : jpeg_common_struct
     /// if a suspending data source is used.
     /// </returns>
     /// <remarks>
-    /// <see cref="jpeg_decompress_struct.jpeg_read_header">jpeg_read_header</see> must be completed before calling this.<br/>
+    /// <see cref="jpeg_read_header">jpeg_read_header</see> must be completed before calling this.<br/>
     /// 
     /// The entire image is read into a set of virtual coefficient-block arrays, one per component.
     /// The return value is an array of virtual-array descriptors.<br/>
     /// 
     /// An alternative usage is to simply obtain access to the coefficient arrays during a 
     /// <see href="../articles/KB/buffered-image-mode.html">buffered-image mode</see> decompression operation. This is allowed after any 
-    /// <see cref="jpeg_decompress_struct.jpeg_finish_output">jpeg_finish_output</see> call. The arrays can be accessed 
-    /// until <see cref="jpeg_decompress_struct.jpeg_finish_decompress">jpeg_finish_decompress</see> is called. 
+    /// <see cref="jpeg_finish_output">jpeg_finish_output</see> call. The arrays can be accessed 
+    /// until <see cref="jpeg_finish_decompress">jpeg_finish_decompress</see> is called. 
     /// Note that any call to the library may reposition the arrays, 
     /// so don't rely on <see cref="jvirt_array{T}.Access"/> results to stay valid across library calls.
     /// </remarks>
@@ -1649,20 +1641,20 @@ public class jpeg_decompress_struct : jpeg_common_struct
         }
 
         /* and it only handles 2h1v or 2h2v sampling ratios */
-        if (m_comp_info![0].H_samp_factor != 2 || m_comp_info![1].H_samp_factor != 1 ||
-            m_comp_info![2].H_samp_factor != 1 || m_comp_info![0].V_samp_factor > 2 ||
-            m_comp_info![1].V_samp_factor != 1 || m_comp_info![2].V_samp_factor != 1)
+        if (Comp_info![0].H_samp_factor != 2 || Comp_info![1].H_samp_factor != 1 ||
+            Comp_info![2].H_samp_factor != 1 || Comp_info![0].V_samp_factor > 2 ||
+            Comp_info![1].V_samp_factor != 1 || Comp_info![2].V_samp_factor != 1)
         {
             return false;
         }
 
         /* furthermore, it doesn't work if we've scaled the IDCTs differently */
-        if (m_comp_info![0].DCT_h_scaled_size != min_DCT_h_scaled_size ||
-            m_comp_info![1].DCT_h_scaled_size != min_DCT_h_scaled_size ||
-            m_comp_info![2].DCT_h_scaled_size != min_DCT_h_scaled_size ||
-            m_comp_info![0].DCT_v_scaled_size != min_DCT_v_scaled_size ||
-            m_comp_info![1].DCT_v_scaled_size != min_DCT_v_scaled_size ||
-            m_comp_info![2].DCT_v_scaled_size != min_DCT_v_scaled_size)
+        if (Comp_info![0].DCT_h_scaled_size != min_DCT_h_scaled_size ||
+            Comp_info![1].DCT_h_scaled_size != min_DCT_h_scaled_size ||
+            Comp_info![2].DCT_h_scaled_size != min_DCT_h_scaled_size ||
+            Comp_info![0].DCT_v_scaled_size != min_DCT_v_scaled_size ||
+            Comp_info![1].DCT_v_scaled_size != min_DCT_v_scaled_size ||
+            Comp_info![2].DCT_v_scaled_size != min_DCT_v_scaled_size)
         {
             return false;
         }
@@ -1817,9 +1809,9 @@ public class jpeg_decompress_struct : jpeg_common_struct
                 break;
 
             case 3:
-                int cid0 = m_comp_info![0].Component_id;
-                int cid1 = m_comp_info![1].Component_id;
-                int cid2 = m_comp_info![2].Component_id;
+                int cid0 = Comp_info![0].Component_id;
+                int cid1 = Comp_info![1].Component_id;
+                int cid2 = Comp_info![2].Component_id;
 
                 // Use Adobe marker info, otherwise try to guess from the component IDs
                 if (m_saw_Adobe_marker)

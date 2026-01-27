@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 
 namespace BitMiracle.LibJpeg.Classic;
@@ -9,71 +8,66 @@ namespace BitMiracle.LibJpeg.Classic;
 /// </summary>
 public readonly struct Buffer2D<T>
 {
-    private readonly T[] _data;
-    private readonly int _width;
-    private readonly int _height;
-
     public Buffer2D(int width, int height)
     {
-        _width = width;
-        _height = height;
-        _data = GC.AllocateUninitializedArray<T>(width * height);
+        Width = width;
+        Height = height;
+        Data = GC.AllocateUninitializedArray<T>(width * height);
     }
 
     public Buffer2D(T[] data, int width, int height)
     {
-        _data = data;
-        _width = width;
-        _height = height;
+        Data = data;
+        Width = width;
+        Height = height;
     }
 
-    public int Width => _width;
-    public int Height => _height;
-    public T[] Data => _data;
-    public bool IsEmpty => _data == null || _data.Length == 0;
+    public int Width { get; }
+    public int Height { get; }
+    public T[] Data { get; }
+    public bool IsEmpty => Data == null || Data.Length == 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<T> GetRow(int row)
     {
-        return _data.AsSpan(row * _width, _width);
+        return Data.AsSpan(row * Width, Width);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<T> GetRowReadOnly(int row)
     {
-        return new ReadOnlySpan<T>(_data, row * _width, _width);
+        return new ReadOnlySpan<T>(Data, row * Width, Width);
     }
 
     /// <summary>
     /// Indexer for compatibility with byte[][] patterns.
     /// Returns a Span for the row.
     /// </summary>
-    public RowAccessor this[int row] => new RowAccessor(_data, row * _width, _width);
+    public RowAccessor this[int row] => new RowAccessor(Data, row * Width, Width);
 
     public readonly ref struct RowAccessor
     {
         private readonly T[] _data;
         private readonly int _offset;
-        private readonly int _length;
 
         internal RowAccessor(T[] data, int offset, int length)
         {
             _data = data;
             _offset = offset;
-            _length = length;
+            Length = length;
         }
 
         public ref T this[int index] => ref _data[_offset + index];
 
-        public int Length => _length;
+        public int Length { get; }
 
-        public Span<T> AsSpan() => _data.AsSpan(_offset, _length);
+        public Span<T> AsSpan() => _data.AsSpan(_offset, Length);
 
         public static implicit operator Span<T>(RowAccessor accessor)
-            => accessor._data.AsSpan(accessor._offset, accessor._length);
+            => accessor._data.AsSpan(accessor._offset, accessor.Length);
 
         public static implicit operator ReadOnlySpan<T>(RowAccessor accessor)
-            => new ReadOnlySpan<T>(accessor._data, accessor._offset, accessor._length);
+            => new ReadOnlySpan<T>(accessor._data, accessor._offset, accessor.Length);
     }
 
     /// <summary>
@@ -96,7 +90,7 @@ public readonly struct Buffer2D<T>
 
     public void Clear()
     {
-        Array.Clear(_data);
+        Array.Clear(Data);
     }
 
     public void CopyRowTo(int sourceRow, Span<T> destination)

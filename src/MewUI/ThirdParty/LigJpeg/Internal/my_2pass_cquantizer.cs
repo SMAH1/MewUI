@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file contains 2-pass color quantization (color mapping) routines.
  * These routines provide selection of a custom color map for an image,
  * followed by mapping of the image to that color map, with optional
@@ -10,8 +10,6 @@
  * way to compute intercolor distances; it's unclear that ordered dither's
  * fundamental assumptions even hold with an irregularly spaced color map.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

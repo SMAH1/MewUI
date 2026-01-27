@@ -1,9 +1,7 @@
-﻿/*
+/*
  * This file contains application interface routines that are used for both
  * compression and decompression.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic;
 

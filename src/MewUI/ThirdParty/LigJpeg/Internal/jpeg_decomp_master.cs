@@ -1,11 +1,9 @@
-﻿/*
+/*
  * This file contains master control logic for the JPEG decompressor.
  * These routines are concerned with selecting the modules to be executed
  * and with determining the number of passes and the work to be done in each
  * pass.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

@@ -7,7 +7,6 @@
  * supplies the equivalent of the main buffer in that case.
  */
 
-using System;
 using System.Buffers;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;

@@ -1,10 +1,8 @@
-﻿/*
+/*
  * This file contains 1-pass color quantization (color mapping) routines.
  * These routines provide mapping to a fixed color map using equally spaced
  * color values.  Optional Floyd-Steinberg or ordered dithering is available.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

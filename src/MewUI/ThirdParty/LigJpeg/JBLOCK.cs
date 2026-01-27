@@ -1,5 +1,3 @@
-using System;
-
 namespace BitMiracle.LibJpeg.Classic;
 
 /// <summary>

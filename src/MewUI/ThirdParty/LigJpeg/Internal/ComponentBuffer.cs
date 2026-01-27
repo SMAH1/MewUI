@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;

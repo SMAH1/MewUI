@@ -1,11 +1,9 @@
-﻿/*
+/*
  * This file contains tables and miscellaneous utility routines needed
  * for both compression and decompression.
  * Note we prefix all global names with "j" to minimize conflicts with
  * a surrounding application.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 

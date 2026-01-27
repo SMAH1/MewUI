@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file contains the JPEG system-independent memory management
  * routines.
  */
@@ -13,7 +13,6 @@
  * The Access method is responsible for making a specific strip area accessible.
  */
 
-using System;
 using System.Diagnostics;
 
 namespace BitMiracle.LibJpeg.Classic;
@@ -47,8 +46,6 @@ public class jvirt_array<T>
 {
     internal delegate T[][] Allocator(int width, int height);
 
-    private jpeg_common_struct? m_cinfo;
-
     private T[][] m_buffer;   /* => the in-memory buffer */
 
     /// <summary>
@@ -73,11 +70,7 @@ public class jvirt_array<T>
     /// <remarks>Uses only for calling 
     /// <see cref="M:BitMiracle.LibJpeg.Classic.jpeg_common_struct.ERREXIT(BitMiracle.LibJpeg.Classic.J_MESSAGE_CODE)">jpeg_common_struct.ERREXIT</see>
     /// on error.</remarks>
-    public jpeg_common_struct? ErrorProcessor
-    {
-        get { return m_cinfo; }
-        set { m_cinfo = value; }
-    }
+    public jpeg_common_struct? ErrorProcessor { get; set; }
 
     /// <summary>
     /// Access the part of a virtual array.
@@ -90,9 +83,9 @@ public class jvirt_array<T>
         /* debugging check */
         if (startRow + numberOfRows > m_buffer.Length)
         {
-            if (m_cinfo != null)
+            if (ErrorProcessor != null)
             {
-                m_cinfo.ERREXIT(J_MESSAGE_CODE.JERR_BAD_VIRTUAL_ACCESS);
+                ErrorProcessor.ERREXIT(J_MESSAGE_CODE.JERR_BAD_VIRTUAL_ACCESS);
             }
             else
             {
@@ -115,9 +108,9 @@ public class jvirt_array<T>
         /* debugging check */
         if (startRow + numberOfRows > m_buffer.Length)
         {
-            if (m_cinfo != null)
+            if (ErrorProcessor != null)
             {
-                m_cinfo.ERREXIT(J_MESSAGE_CODE.JERR_BAD_VIRTUAL_ACCESS);
+                ErrorProcessor.ERREXIT(J_MESSAGE_CODE.JERR_BAD_VIRTUAL_ACCESS);
             }
             else
             {
@@ -133,9 +126,9 @@ public class jvirt_array<T>
         /* debugging check */
         if (startRow + numberOfRows > m_buffer.Length || numberOfRows > destination.Length)
         {
-            if (m_cinfo != null)
+            if (ErrorProcessor != null)
             {
-                m_cinfo.ERREXIT(J_MESSAGE_CODE.JERR_BAD_VIRTUAL_ACCESS);
+                ErrorProcessor.ERREXIT(J_MESSAGE_CODE.JERR_BAD_VIRTUAL_ACCESS);
             }
             else
             {

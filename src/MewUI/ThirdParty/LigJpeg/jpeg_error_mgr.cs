@@ -1,11 +1,10 @@
-﻿/*
+/*
  * This file contains simple error-reporting and trace-message routines.
  * Many applications will want to override some or all of these routines.
  *
  * These routines are used by both the compression and decompression code.
  */
 
-using System;
 using System.Globalization;
 
 #if NET5_0_OR_GREATER
@@ -44,7 +43,7 @@ public class jpeg_error_mgr
     /// 1: first level of tracing detail.<br/>
     /// 2, 3, ...: successively more detailed tracing messages.
     /// </value>
-    /// <seealso cref="jpeg_error_mgr.emit_message"/>
+    /// <seealso cref="emit_message"/>
     public int Trace_level
     {
         get { return m_trace_level; }
@@ -56,7 +55,7 @@ public class jpeg_error_mgr
     /// </summary>
     /// <value>The num_warnings.</value>
     /// <remarks>For recoverable corrupt-data errors, we emit a warning message, but keep going 
-    /// unless <see cref="jpeg_error_mgr.emit_message">emit_message</see> chooses to abort. 
+    /// unless <see cref="emit_message">emit_message</see> chooses to abort. 
     /// <c>emit_message</c> should count warnings in <c>Num_warnings</c>. The surrounding application 
     /// can check for bad data by seeing if <c>Num_warnings</c> is nonzero at the end of processing.</remarks>
     public int Num_warnings
@@ -67,7 +66,7 @@ public class jpeg_error_mgr
     /// <summary>
     /// Receives control for a fatal error.
     /// </summary>
-    /// <remarks>This method calls <see cref="jpeg_error_mgr.output_message">output_message</see> 
+    /// <remarks>This method calls <see cref="output_message">output_message</see> 
     /// and then throws an exception.</remarks>
     /// <seealso href="41dc1a3b-0dea-4594-87d2-c213ab1049e1.htm" target="_self">Error handling</seealso>
     public virtual void error_exit()
@@ -90,7 +89,7 @@ public class jpeg_error_mgr
     /// 2, 3, ...: successively more detailed tracing messages.
     /// </param>
     /// <remarks>The main reason for overriding this method would be to abort on warnings.
-    /// This method calls <see cref="jpeg_error_mgr.output_message">output_message</see> for message showing.<br/>
+    /// This method calls <see cref="output_message">output_message</see> for message showing.<br/>
     /// 
     /// An application might override this method if it wanted to abort on 
     /// warnings or change the policy about which messages to display.
@@ -127,7 +126,7 @@ public class jpeg_error_mgr
     /// </summary>
     /// <remarks>Override this to send messages somewhere other than Console. 
     /// Note that this method does not know how to generate a message, only where to send it.
-    /// For extending a generation of messages see <see cref="jpeg_error_mgr.format_message">format_message</see>.
+    /// For extending a generation of messages see <see cref="format_message">format_message</see>.
     /// </remarks>
     /// <seealso href="41dc1a3b-0dea-4594-87d2-c213ab1049e1.htm" target="_self">Error handling</seealso>
     public virtual void output_message()
@@ -142,7 +141,7 @@ public class jpeg_error_mgr
     /// <summary>
     /// Constructs a readable error message string.
     /// </summary>
-    /// <remarks>This method is called by <see cref="jpeg_error_mgr.output_message">output_message</see>.
+    /// <remarks>This method is called by <see cref="output_message">output_message</see>.
     /// Few applications should need to override this method. One possible reason for doing so is to 
     /// implement dynamic switching of error message language.</remarks>
     /// <returns>The formatted message</returns>

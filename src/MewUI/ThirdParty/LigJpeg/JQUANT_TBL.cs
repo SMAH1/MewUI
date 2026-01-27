@@ -1,4 +1,4 @@
-﻿namespace BitMiracle.LibJpeg.Classic;
+namespace BitMiracle.LibJpeg.Classic;
 
 /// <summary>
 /// DCT coefficient quantization tables.
@@ -10,7 +10,6 @@ public class JQUANT_TBL
      * You could suppress output of a table by setting this to true.
      * (See jpeg_suppress_tables for an example.)
      */
-    private bool m_sent_table;        /* true when table has been output */
 
     /* This array gives the coefficient quantizers in natural array order
      * (not the zigzag order in which they are stored in a JPEG DQT marker).
@@ -29,9 +28,5 @@ public class JQUANT_TBL
     /// <c>true</c> when it's been output to the file. You could suppress output of a table by setting this to <c>true</c>.
     /// </value>
     /// <remarks>This property is used only during compression.</remarks>
-    public bool Sent_table
-    {
-        get { return m_sent_table; }
-        set { m_sent_table = value; }
-    }
+    public bool Sent_table { get; set; }
 }

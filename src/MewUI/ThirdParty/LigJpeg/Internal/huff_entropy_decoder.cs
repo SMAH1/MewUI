@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file contains Huffman entropy decoding routines.
  * Both sequential and progressive modes are supported in this single module.
  *
@@ -8,8 +8,6 @@
  * into local working storage, and update them back to the permanent
  * storage only upon successful completion of an MCU.
  */
-
-using System;
 
 namespace BitMiracle.LibJpeg.Classic.Internal;
 
