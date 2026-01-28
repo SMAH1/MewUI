@@ -114,7 +114,7 @@ FrameworkElement TopBar()
                                 .Children(
                                     ThemeModePicker(),
 
-                                    new TextBlock()
+                                    new Label()
                                         .Ref(out themeText)
                                         .CenterVertical(),
 
