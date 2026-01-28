@@ -17,6 +17,17 @@ var maxFpsEnabled = new ObservableValue<bool>(false);
 
 var currentAccent = ThemeManager.DefaultAccent;
 
+var app = Application
+    .Create()
+    .UseMetrics(ThemeMetrics.Default with
+    {
+        FontFamily = "Noto Sans KR",
+        ControlCornerRadius = 6,
+        BaseControlHeight = 32,
+        FontSize = 13
+    });
+
+
 var logo = ImageSource.FromFile("logo_h-1280.png");
 var april = ImageSource.FromFile("april.jpg");
 
@@ -66,7 +77,7 @@ using (var rs = typeof(Program).Assembly.GetManifestResourceStream("Aprillz.MewU
     root.Icon = IconSource.FromStream(rs);
 }
 
-Application.Run(root);
+app.Run(root);
 
 FrameworkElement TopBar()
 {
@@ -208,8 +219,7 @@ FrameworkElement Card(string title, FrameworkElement content, double minWidth = 
     var header = new Label()
         .WithTheme((t, c) => c.Foreground(t.Palette.Accent))
         .Text(title)
-        .Bold()
-        .FontSize(12);
+        .Bold();
 
     return new Border()
         .MinWidth(minWidth)
@@ -251,6 +261,7 @@ FrameworkElement BuildGalleryContent()
             Section("Menus", MenusPage()),
             Section("Selection", SelectionPage()),
             Section("Lists", ListsPage()),
+            Section("Panels", PanelsPage()),
             Section("Layout", LayoutPage()),
             Section("Media", MediaPage())
         );
@@ -560,6 +571,133 @@ FrameworkElement LayoutPage()
                         .Spacing(6)
                         .Children(Enumerable.Range(1, 15).Select(i => new Label().Text($"Line {i} - The quick brown fox jumps over the lazy dog.")).ToArray())
                 )
+        )
+    );
+}
+
+FrameworkElement PanelsPage()
+{
+    Button canvasButton = null!;
+    var canvasInfo = new ObservableValue<string>("Pos: 20,20");
+    double left = 20;
+    double top = 20;
+
+    void MoveCanvasButton()
+    {
+        left = (left + 24) % 140;
+        top = (top + 16) % 70;
+        Canvas.SetLeft(canvasButton, left);
+        Canvas.SetTop(canvasButton, top);
+        canvasInfo.Value = $"Pos: {left:0},{top:0}";
+    }
+
+    FrameworkElement PanelCard(string title, FrameworkElement content) =>
+        Card(title, new Border()
+                .WithTheme((t, b) => b.Background(t.Palette.ContainerBackground).BorderBrush(t.Palette.ControlBorder))
+                .BorderThickness(1)
+                .CornerRadius(10)
+                .Width(280)
+                .Padding(8)
+                .Child(content));
+
+    return CardGrid(
+        PanelCard("StackPanel",
+            new StackPanel()
+                .Vertical()
+                .Spacing(6)
+                .Children(
+                    new Button().Content("A"),
+                    new Button().Content("B"),
+                    new Button().Content("C")
+                )
+        ),
+
+        PanelCard("DockPanel",
+            new DockPanel()
+                .LastChildFill()
+                .Children(
+                    new Button().Content("Left").DockLeft(),
+                    new Button().Content("Top").DockTop(),
+                    new Button().Content("Bottom").DockBottom(),
+                    new Button().Content("Fill")
+                )
+        ),
+
+        PanelCard("WrapPanel",
+            new WrapPanel()
+                .Orientation(Orientation.Horizontal)
+                .Spacing(6)
+                .ItemWidth(60)
+                .ItemHeight(28)
+                .Children(Enumerable.Range(1, 8).Select(i => new Button().Content($"#{i}")).ToArray())
+        ),
+
+        PanelCard("UniformGrid",
+            new UniformGrid()
+                .Columns(3)
+                .Rows(2)
+                .Spacing(6)
+                .Children(
+                    new Button().Content("1"),
+                    new Button().Content("2"),
+                    new Button().Content("3"),
+                    new Button().Content("4"),
+                    new Button().Content("5"),
+                    new Button().Content("6")
+                )
+        ),
+
+        PanelCard("Grid (Span)",
+            new Grid()
+                .Columns("Auto,*,*")
+                .Rows("Auto,Auto,Auto")
+                .AutoIndexing()
+                .Spacing(6)
+                .Children(
+                    new Button().Content("ColSpan 2")
+                        .ColumnSpan(2),
+
+                    new Button().Content("R1C1"),
+
+                    new Button().Content("RowSpan 2")
+                        .RowSpan(2),
+
+                    new Button().Content("R1C2"),
+
+                    new Button().Content("R1C2"),
+
+                    new Button().Content("R2C1"),
+
+                    new Button().Content("R2C2")
+                )
+        ),
+
+        Card("Canvas",
+            new StackPanel()
+                .Vertical()
+                .Spacing(6)
+                .Children(
+                    new Border()
+                        .Height(120)
+                        .WithTheme((t, b) => b.Background(t.Palette.ContainerBackground).BorderBrush(t.Palette.ControlBorder))
+                        .BorderThickness(1)
+                        .CornerRadius(10)
+                        .Child(
+                            new Canvas()
+                                .Children(
+                                    new Button()
+                                        .Ref(out canvasButton)
+                                        .Content("Move")
+                                        .OnClick(MoveCanvasButton)
+                                        .CanvasPosition(left, top)
+                                )
+                        ),
+
+                    new Label()
+                        .BindText(canvasInfo)
+                        .FontSize(11)
+                ),
+            minWidth: 320
         )
     );
 }

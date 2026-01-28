@@ -20,16 +20,20 @@ public class Canvas : Panel
 
     #region Attached Properties
 
-    public static void SetLeft(Element element, double value) => GetOrCreate(element).Left = value;
+    public static void SetLeft(Element element, double value) =>
+        SetAttachedValue(element, ref GetOrCreate(element).Left, value);
     public static double GetLeft(Element element) => TryGet(element, out var props) ? props.Left : double.NaN;
 
-    public static void SetTop(Element element, double value) => GetOrCreate(element).Top = value;
+    public static void SetTop(Element element, double value) =>
+        SetAttachedValue(element, ref GetOrCreate(element).Top, value);
     public static double GetTop(Element element) => TryGet(element, out var props) ? props.Top : double.NaN;
 
-    public static void SetRight(Element element, double value) => GetOrCreate(element).Right = value;
+    public static void SetRight(Element element, double value) =>
+        SetAttachedValue(element, ref GetOrCreate(element).Right, value);
     public static double GetRight(Element element) => TryGet(element, out var props) ? props.Right : double.NaN;
 
-    public static void SetBottom(Element element, double value) => GetOrCreate(element).Bottom = value;
+    public static void SetBottom(Element element, double value) =>
+        SetAttachedValue(element, ref GetOrCreate(element).Bottom, value);
     public static double GetBottom(Element element) => TryGet(element, out var props) ? props.Bottom : double.NaN;
 
     private static CanvasAttachedProperties GetOrCreate(Element element) =>
@@ -37,6 +41,22 @@ public class Canvas : Panel
 
     private static bool TryGet(Element element, [NotNullWhen(true)] out CanvasAttachedProperties? properties)
         => _attachedProperties.TryGetValue(element, out properties!);
+
+    private static void SetAttachedValue(Element element, ref double field, double value)
+    {
+        if (double.IsNaN(field) && double.IsNaN(value))
+        {
+            return;
+        }
+
+        if (field.Equals(value))
+        {
+            return;
+        }
+
+        field = value;
+        element.InvalidateArrange();
+    }
 
     #endregion
 
