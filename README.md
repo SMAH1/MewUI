@@ -34,7 +34,7 @@
 You can run it immediately by entering the following command in the Windows command line or a Linux terminal. (.NET 10 SDK required)
 > [!WARNING]
 > This command downloads and executes code directly from GitHub.
-```bahs
+```bash
 curl -sL https://raw.githubusercontent.com/aprillz/MewUI/refs/heads/main/samples/FBASample/fba_sample.cs -o - | dotnet run -
 ```
 
@@ -81,7 +81,7 @@ https://github.com/user-attachments/assets/40f4da93-6176-4b2c-9799-09751ca27009
     #:property OutputType=Exe
     #:property TargetFramework=net10.0
 
-    #:package Aprillz.MewUI@0.2.0
+    #:package Aprillz.MewUI@0.8.3
 
     // ...
     ```
@@ -185,15 +185,12 @@ Panels:
 ---
 ## 🎨 Theme
 
-Theme is split into two parts:
-- `Palette` - colors (including derived colors based on background + accent)
-- `Theme` - non-color parameters (corner radius, default font, plus a `Palette`)
+MewUI uses a `Theme` object (colors + metrics) and `ThemeManager` to control defaults and runtime changes.
 
-Accent switching:
+- Configure defaults before `Application.Run(...)` via `ThemeManager.Default*`
+- Change at runtime via `Application.Current.SetTheme(...)` / `Application.Current.SetAccent(...)`
 
-```csharp
-Theme.Current = Theme.Current.WithAccent(Color.FromRgb(214, 176, 82));
-```
+See: `docs/Theme.md`
 
 ---
 ## 🖌️ Rendering Backends
@@ -202,22 +199,23 @@ Rendering is abstracted through:
 - `IGraphicsFactory` / `IGraphicsContext`
 
 Backends:
-- `Direct2D` (Windows)
-- `GDI` (Windows)
-- `OpenGL` (Windows / Linux)
+- `Direct2D` (Windows): `Aprillz.MewUI.Backend.Direct2D`
+- `GDI` (Windows): `Aprillz.MewUI.Backend.Gdi`
+- `OpenGL` (Windows): `Aprillz.MewUI.Backend.OpenGL.Win32`
+- `OpenGL` (Linux/X11): `Aprillz.MewUI.Backend.OpenGL.X11`
+- `Vulkan` (Linux/X11, experimental): `Aprillz.MewUI.Backend.Vulkan.X11`
 
-The sample defaults to `Direct2D` on Windows, and `OpenGL` on Linux.
-- `Direct2D`: slower startup and larger resident memory, but better suited for complex layouts/effects
-- `GDI`: lightweight and fast startup, but CPU-heavy and not ideal for high-DPI, large windows, or complex UIs
-- `OpenGL`: cross-platform and works with the Linux/X11 host, but currently more limited and still experimental
+Backends are registered by the referenced backend packages (Trim/AOT-friendly). In app code you typically either:
+- call `*Backend.Register()` before `Application.Run(...)`, or
+- use the builder chain: `Application.Create().Use...().Run(...)`
 ---
 ## 🪟 Platform Abstraction
 
 Windowing and the message loop are abstracted behind a platform layer.
 
 Currently implemented:
-- Windows (`Win32PlatformHost`)
-- Linux/X11 (experimental)
+- Windows (`Aprillz.MewUI.Platform.Win32`)
+- Linux/X11 (`Aprillz.MewUI.Platform.X11`, experimental)
 
 ### Linux dialogs dependency
 On Linux, `MessageBox` and file dialogs are currently implemented via external tools:
@@ -232,6 +230,10 @@ If neither is available in `PATH`, MewUI throws:
 
 - [C# Markup](docs/CSharpMarkup.md)
 - [Binding](docs/Binding.md)
+- [Theme](docs/Theme.md)
+- [Application Lifecycle](docs/ApplicationLifecycle.md)
+- [Layout](docs/Layout.md)
+- [RenderLoop (internal)](docs/RenderLoop.md)
 
 ---
 ## 🧭 Roadmap (TODO)
