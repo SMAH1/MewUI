@@ -73,6 +73,68 @@ public sealed class Image : FrameworkElement
         }
     }
 
+    public bool TryPeekColor(Point positionDip, out Color color)
+    {
+        color = default;
+        if (Source is not ImageSource imageSource)
+        {
+            return false;
+        }
+
+        // Do not decode in this method. Decoding happens when the source is first used for rendering
+        // (ImageSource.CreateImage caches the decoded pixel buffer). If the source hasn't been used
+        // yet, simply return false.
+        if (!imageSource.TryGetDecodedBitmap(out var decoded))
+        {
+            return false;
+        }
+
+        var srcRect = GetViewBoxPixels(decoded.WidthPx, decoded.HeightPx);
+        if (srcRect.Width <= 0 || srcRect.Height <= 0)
+        {
+            return false;
+        }
+
+        ComputeRects(srcRect, Bounds, StretchMode, AlignmentX, AlignmentY, out var dest, out var src);
+        if (dest.Width <= 0 || dest.Height <= 0 || src.Width <= 0 || src.Height <= 0)
+        {
+            return false;
+        }
+
+        // Position is window-relative, same coordinate space as Bounds/dest.
+        if (!dest.Contains(positionDip))
+        {
+            return false;
+        }
+
+        double u = (positionDip.X - dest.X) / dest.Width;
+        double v = (positionDip.Y - dest.Y) / dest.Height;
+
+        double sx = src.X + u * src.Width;
+        double sy = src.Y + v * src.Height;
+
+        int px = (int)System.Math.Floor(sx);
+        int py = (int)System.Math.Floor(sy);
+
+        if ((uint)px >= (uint)decoded.WidthPx || (uint)py >= (uint)decoded.HeightPx)
+        {
+            return false;
+        }
+
+        int index = py * decoded.StrideBytes + px * 4 + 3; // BGRA
+        if ((uint)index >= (uint)decoded.Data.Length)
+        {
+            return false;
+        }
+
+        var data = decoded.Data;
+        byte b = data[index - 3];
+        byte g = data[index - 2];
+        byte r = data[index - 1];
+        byte a = data[index];
+        color = new Color(a, r, g, b);
+        return true;
+    }
     protected override Size MeasureContent(Size availableSize)
     {
         var img = GetImage();
@@ -81,7 +143,7 @@ public sealed class Image : FrameworkElement
             return Size.Empty;
         }
 
-        var src = GetViewBoxPixels(img);
+        var src = GetViewBoxPixels(img.PixelWidth, img.PixelHeight);
 
         // Pixels are treated as DIPs for now (1px == 1dip at 96dpi).
         return new Size(src.Width, src.Height);
@@ -106,7 +168,7 @@ public sealed class Image : FrameworkElement
 
         try
         {
-            var srcRect = GetViewBoxPixels(img);
+            var srcRect = GetViewBoxPixels(img.PixelWidth, img.PixelHeight);
             var srcSize = srcRect.Size;
             if (srcSize.IsEmpty)
             {
@@ -126,10 +188,10 @@ public sealed class Image : FrameworkElement
         }
     }
 
-    private Rect GetViewBoxPixels(IImage img)
+    private Rect GetViewBoxPixels(int pixelWidth, int pixelHeight)
     {
-        double iw = Math.Max(0, img.PixelWidth);
-        double ih = Math.Max(0, img.PixelHeight);
+        double iw = System.Math.Max(0, pixelWidth);
+        double ih = System.Math.Max(0, pixelHeight);
         var full = new Rect(0, 0, iw, ih);
         if (ViewBox is not Rect vb)
         {

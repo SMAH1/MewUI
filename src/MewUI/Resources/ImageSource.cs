@@ -18,6 +18,11 @@ public sealed class ImageSource : IImageSource
     /// </summary>
     public string? FormatId => ImageDecoders.DetectFormatId(Data);
 
+    private readonly object _decodeLock = new();
+    private DecodedBitmap _decodedBitmap;
+    private bool _decodedValid;
+    private StaticPixelBufferSource? _decodedPixelSource;
+
     private ImageSource(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -99,9 +104,54 @@ public sealed class ImageSource : IImageSource
         return new ImageSource(ms.ToArray());
     }
 
+    internal bool TryGetDecodedBitmap(out DecodedBitmap bitmap)
+    {
+        if (_decodedValid)
+        {
+            bitmap = _decodedBitmap;
+            return true;
+        }
+
+        bitmap = default;
+        return false;
+    }
+
+    private bool TryEnsureDecoded(out StaticPixelBufferSource pixelSource)
+    {
+        lock (_decodeLock)
+        {
+            if (_decodedValid && _decodedPixelSource != null)
+            {
+                pixelSource = _decodedPixelSource;
+                return true;
+            }
+
+            if (!ImageDecoders.TryDecode(Data, out var decoded))
+            {
+                pixelSource = null!;
+                return false;
+            }
+
+            _decodedBitmap = decoded;
+            _decodedValid = true;
+            _decodedPixelSource = new StaticPixelBufferSource(decoded.WidthPx, decoded.HeightPx, decoded.Data);
+            pixelSource = _decodedPixelSource;
+            return true;
+        }
+    }
+
     public IImage CreateImage(IGraphicsFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
+
+        // Prefer the decoded pixel path so rendering and sampling share the same decode work and buffer.
+        // Fall back to the factory's byte-based creation so custom factories can handle formats not supported
+        // by the built-in decoders.
+        if (factory.Backend != GraphicsBackend.Custom && TryEnsureDecoded(out var pixels))
+        {
+            return factory.CreateImageFromPixelSource(pixels);
+        }
+
         return factory.CreateImageFromBytes(Data);
     }
 }
