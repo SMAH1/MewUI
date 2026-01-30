@@ -647,6 +647,7 @@ internal sealed class X11WindowBackend : IWindowBackend
         int xPx = e.x;
         int yPx = e.y;
         var pos = new Point(xPx / Window.DpiScale, yPx / Window.DpiScale);
+        Window.UpdateLastMousePosition(pos, pos);
 
         if (isDown)
         {
@@ -755,6 +756,7 @@ internal sealed class X11WindowBackend : IWindowBackend
     private void HandleMotion(XMotionEvent e)
     {
         var pos = new Point(e.x / Window.DpiScale, e.y / Window.DpiScale);
+        Window.UpdateLastMousePosition(pos, pos);
         var element = _capturedElement ?? Window.HitTest(pos);
 
         if (element != _mouseOverElement)

@@ -594,6 +594,7 @@ internal sealed class Win32WindowBackend : IWindowBackend
     {
         var pos = GetMousePosition(lParam);
         var screenPos = ClientToScreen(pos);
+        Window.UpdateLastMousePosition(pos, screenPos);
 
         var element = _capturedElement ?? Window.HitTest(pos);
 
@@ -618,6 +619,7 @@ internal sealed class Win32WindowBackend : IWindowBackend
         int yPx = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
         var pos = new Point(xPx / Window.DpiScale, yPx / Window.DpiScale);
         var screenPos = ClientToScreen(pos);
+        Window.UpdateLastMousePosition(pos, screenPos);
 
         if (isDown)
         {

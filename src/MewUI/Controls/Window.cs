@@ -33,11 +33,22 @@ public class Window : ContentControl
     private readonly RadioGroupManager _radioGroups = new();
     private readonly List<UIElement> _mouseOverOldPath = new(capacity: 16);
     private readonly List<UIElement> _mouseOverNewPath = new(capacity: 16);
+    private Point _lastMousePositionDip;
+    private Point _lastMouseScreenPositionPx;
     private bool _loadedRaised;
     private bool _firstFrameRenderedRaised;
     private bool _firstFrameRenderedPending;
     private bool _subscribedToDispatcherChanged;
     private WindowLifetimeState _lifetimeState;
+    internal Point LastMousePositionDip => _lastMousePositionDip;
+
+    internal Point LastMouseScreenPositionPx => _lastMouseScreenPositionPx;
+
+    internal void UpdateLastMousePosition(Point positionDip, Point screenPositionPx)
+    {
+        _lastMousePositionDip = positionDip;
+        _lastMouseScreenPositionPx = screenPositionPx;
+    }
 
     internal void UpdateMouseOverChain(UIElement? oldLeaf, UIElement? newLeaf)
     {
@@ -896,6 +907,43 @@ public class Window : ContentControl
         Invalidate();
     }
 
+    private ToolTip? _toolTip;
+    private UIElement? _toolTipOwner;
+
+    internal Size MeasureToolTip(string text, Size availableSize)
+    {
+        _toolTip ??= new ToolTip();
+        _toolTip.Text = text ?? string.Empty;
+        _toolTip.Measure(availableSize);
+        return _toolTip.DesiredSize;
+    }
+
+    internal void ShowToolTip(UIElement owner, string text, Rect bounds)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+
+        _toolTip ??= new ToolTip();
+        _toolTip.Text = text ?? string.Empty;
+        _toolTipOwner = owner;
+        ShowPopup(owner, _toolTip, bounds);
+    }
+
+    internal void CloseToolTip(UIElement? owner = null)
+    {
+        if (_toolTip == null)
+        {
+            return;
+        }
+
+        if (owner != null && !ReferenceEquals(_toolTipOwner, owner))
+        {
+            return;
+        }
+
+        ClosePopup(_toolTip);
+        _toolTipOwner = null;
+    }
+
     internal bool TryGetPopupOwner(UIElement popup, out UIElement owner)
     {
         for (int i = 0; i < _popups.Count; i++)
@@ -947,6 +995,10 @@ public class Window : ContentControl
             EnsureFocusNotInClosedPopup(entry.Element, entry.Owner);
 
             Invalidate();
+            if (ReferenceEquals(popup, _toolTip))
+            {
+                _toolTipOwner = null;
+            }
             return;
         }
     }
